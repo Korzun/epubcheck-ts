@@ -11,4 +11,20 @@ describe('CATALOG', () => {
   it('templates carry positional placeholders where needed', () => {
     expect(CATALOG['RSC-005']?.template).toContain('%1$s')
   })
+
+  it('defines OPF package message ids with severities', () => {
+    expect(CATALOG['OPF-001']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-030']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-033']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-048']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-049']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-074']?.severity).toBe('ERROR')
+    expect(CATALOG['RSC-001']?.severity).toBe('ERROR')
+  })
+
+  it('OPF templates carry the expected placeholders', () => {
+    expect(CATALOG['OPF-030']?.template).toContain('%1$s')
+    expect(CATALOG['OPF-049']?.template).toContain('%1$s')
+    expect(CATALOG['RSC-001']?.template).toContain('%1$s')
+  })
 })
