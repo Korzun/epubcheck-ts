@@ -1,3 +1,6 @@
 node_modules
 dist
 *.log
+
+# Superpowers subagent-driven-development scratch (ledger, task briefs/reports, diffs)
+.superpowers/
