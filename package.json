@@ -1,0 +1,31 @@
+{
+  "name": "epubcheck-ts",
+  "version": "0.0.0",
+  "description": "A TypeScript-native EPUB validator (library).",
+  "type": "module",
+  "license": "BSD-3-Clause",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "saxes": "6.0.0"
+  },
+  "devDependencies": {
+    "tsup": "8.5.1",
+    "typescript": "5.7.2",
+    "vitest": "4.1.9"
+  }
+}
