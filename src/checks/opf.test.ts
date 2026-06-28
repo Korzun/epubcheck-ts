@@ -93,3 +93,33 @@ describe('validateOpf — manifest', () => {
     expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml'])).map((m) => m.id)).not.toContain('RSC-001')
   })
 })
+
+describe('validateOpf — spine and nav', () => {
+  const navItem: ManifestItem = { id: 'nav', href: 'nav.xhtml', mediaType: 'application/xhtml+xml', properties: ['nav'], loc: LOC }
+  const c = emptyContainer(['EPUB/nav.xhtml'])
+
+  it('RSC-005 when there is no spine', () => {
+    const pkg = validPkg({ spinePresent: false, spine: [] })
+    expect(validateOpf(pkg, c).some((m) => m.id === 'RSC-005' && m.message.includes('spine element'))).toBe(true)
+  })
+  it('RSC-005 when the spine has no itemref', () => {
+    const pkg = validPkg({ spinePresent: true, spine: [] })
+    expect(validateOpf(pkg, c).some((m) => m.id === 'RSC-005' && m.message.includes('at least one itemref'))).toBe(true)
+  })
+  it('OPF-049 when an itemref idref has no manifest item', () => {
+    const pkg = validPkg({ spine: [{ idref: 'missing', linear: true, properties: [], loc: LOC }] })
+    expect(validateOpf(pkg, c).map((m) => m.id)).toContain('OPF-049')
+  })
+  it('OPF-033 when no spine item is linear', () => {
+    const pkg = validPkg({ spine: [{ idref: 'nav', linear: false, properties: [], loc: LOC }] })
+    expect(validateOpf(pkg, c).map((m) => m.id)).toContain('OPF-033')
+  })
+  it('RSC-005 when there is not exactly one nav item', () => {
+    const pkg = validPkg({ manifest: [{ ...navItem, properties: [] }] })
+    expect(validateOpf(pkg, c).some((m) => m.id === 'RSC-005' && m.message.includes('"nav" property'))).toBe(true)
+  })
+  it('RSC-005 when the nav item is not XHTML', () => {
+    const pkg = validPkg({ manifest: [{ ...navItem, mediaType: 'text/html' }] })
+    expect(validateOpf(pkg, c).some((m) => m.id === 'RSC-005' && m.message.includes('Navigation Document'))).toBe(true)
+  })
+})
