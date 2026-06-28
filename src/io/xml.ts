@@ -62,7 +62,7 @@ export function parseXml(bytes: Uint8Array, path: string): { root?: XmlNode; mes
   }
 
   if (failed) return { messages }
-  return { root: document.children![0] as XmlNode | undefined, messages }
+  return { root: document.children![0], messages }
 }
 
 /** Element children of a node (text nodes filtered out). */

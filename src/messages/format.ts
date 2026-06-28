@@ -18,6 +18,7 @@ export interface Message {
 function applyTemplate(template: string, args: unknown[]): string {
   return template.replace(/%(\d+)\$s/g, (_match, n: string) => {
     const value = args[Number(n) - 1]
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- applyTemplate args are always string/number primitives in practice; unknown[] is intentional for caller flexibility but objects are never passed
     return value === undefined ? '' : String(value)
   })
 }
