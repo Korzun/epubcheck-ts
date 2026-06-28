@@ -58,3 +58,38 @@ describe('validateOpf — package level', () => {
     expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml'])).some((m) => m.id === 'RSC-005' && m.message.includes('dcterms:modified'))).toBe(true)
   })
 })
+
+describe('validateOpf — manifest', () => {
+  const navItem: ManifestItem = { id: 'nav', href: 'nav.xhtml', mediaType: 'application/xhtml+xml', properties: ['nav'], loc: LOC }
+
+  it('RSC-005 when an item is missing a required attribute', () => {
+    const bad: ManifestItem = { id: 'c1', href: undefined, mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
+    const pkg = validPkg({ manifest: [navItem, bad], spine: [{ idref: 'nav', linear: true, properties: [], loc: LOC }] })
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml'])).some((m) => m.id === 'RSC-005' && m.message.includes('required attribute'))).toBe(true)
+  })
+
+  it('RSC-005 on a duplicate manifest item id', () => {
+    const dup: ManifestItem = { id: 'nav', href: 'c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
+    const pkg = validPkg({ manifest: [navItem, dup] })
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml', 'EPUB/c1.xhtml'])).some((m) => m.id === 'RSC-005' && m.message.includes('Duplicate manifest item id'))).toBe(true)
+  })
+
+  it('OPF-074 when two items resolve to the same href', () => {
+    const a: ManifestItem = { id: 'a', href: 'c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
+    const b: ManifestItem = { id: 'b', href: './c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
+    const pkg = validPkg({ manifest: [navItem, a, b] })
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml', 'EPUB/c1.xhtml'])).map((m) => m.id)).toContain('OPF-074')
+  })
+
+  it('RSC-001 when an item href is not present in the container', () => {
+    const missing: ManifestItem = { id: 'm', href: 'gone.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
+    const pkg = validPkg({ manifest: [navItem, missing] })
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml'])).map((m) => m.id)).toContain('RSC-001')
+  })
+
+  it('does not report RSC-001 for a remote href', () => {
+    const remote: ManifestItem = { id: 'r', href: 'https://example.com/x.mp4', mediaType: 'video/mp4', properties: [], loc: LOC }
+    const pkg = validPkg({ manifest: [navItem, remote] })
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml'])).map((m) => m.id)).not.toContain('RSC-001')
+  })
+})
