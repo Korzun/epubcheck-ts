@@ -149,11 +149,12 @@ interface Resource {
   mediaType?: string                  // filled in post-OPF-parse
 }
 interface EpubContainer {
-  resources: Map<string, Resource>
+  resources: Map<string, Resource>    // pure data, no methods
   rootfiles: string[]                 // from container.xml
   hasEncryption: boolean              // META-INF/encryption.xml present
-  get(path: string): Resource | undefined
 }
+// Resource lookup is a standalone helper (util/), keeping EpubContainer pure data:
+function getResource(container: EpubContainer, path: string): Resource | undefined
 
 // parse/opf.ts
 interface ManifestItem { id: string; href: string; mediaType: string; properties: string[]; fallback?: string }
@@ -226,6 +227,7 @@ interface ValidateOptions {
 
 // Layered, composable functions (all exported).
 function openEpub(input: Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>): Promise<EpubContainer>
+function getResource(container: EpubContainer, path: string): Resource | undefined
 function parseOpf(container: EpubContainer): { pkg?: PackageDocument; messages: Message[] }
 function parseNav(item: ManifestItem, container: EpubContainer): { nav?: NavDocument; messages: Message[] }
 function validateOcf(container: EpubContainer): Message[]
