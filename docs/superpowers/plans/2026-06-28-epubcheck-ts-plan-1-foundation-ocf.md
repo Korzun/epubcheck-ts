@@ -6,7 +6,7 @@
 
 **Architecture:** A pipeline of pure functions over plain data. `validateEpub(bytes)` unzips the EPUB (`openEpub` via fflate), parses XML to a positioned tree (`parseXml` via saxes), runs `validateOcf`, and aggregates messages into a `Report` (`buildReport`). Validation problems become messages; nothing throws for invalid EPUBs.
 
-**Tech Stack:** TypeScript (ESM), `fflate` (ZIP), `saxes` (XML w/ line/column), `vitest` (tests), `tsup` (build).
+**Tech Stack:** TypeScript (ESM), `fflate` (ZIP), `saxes` (XML w/ line/column), `vitest` (tests), `tsdown` (build).
 
 **Spec:** `docs/superpowers/specs/2026-06-28-epubcheck-ts-design.md`
 
@@ -17,7 +17,7 @@ These apply to every task; copied verbatim from the spec.
 - **ESM-only**, TypeScript source, ship `.d.ts`. Target **ES2022 / Node 18+ / evergreen browsers**.
 - **Functional style, no classes.** All structures are plain data; all behavior is functions.
 - **Runtime-agnostic core:** operate on bytes (`Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>`); **zero Node-only APIs** in `src/` (no `fs`, no `Buffer`, no `node:*`). Use `TextDecoder`, `DataView`, web `ReadableStream`.
-- **Runtime deps:** only `fflate` and `saxes`. **Dev deps:** only `vitest`, `tsup`, `typescript`.
+- **Runtime deps:** only `fflate` and `saxes`. **Dev deps:** only `vitest`, `tsdown`, `typescript`.
 - **Types live with their producer** — no types-only files.
 - **Unit tests are colocated** (`foo.ts` + `foo.test.ts`). Integration tests live under `test/`.
 - **Reuse epubcheck message IDs** (e.g. `PKG-006`, `RSC-002`); severities/templates come from the ported catalog.
@@ -31,7 +31,7 @@ These apply to every task; copied verbatim from the spec.
 ```
 package.json                 # ESM package manifest, scripts, deps
 tsconfig.json                # ES2022, strict, declaration
-tsup.config.ts               # build to dist/ (ESM + d.ts)
+tsdown.config.ts             # build to dist/ (ESM + d.ts)
 vitest.config.ts             # test config
 .gitignore
 src/
@@ -56,7 +56,7 @@ test/
 ### Task 1: Project scaffolding
 
 **Files:**
-- Create: `package.json`, `tsconfig.json`, `tsup.config.ts`, `vitest.config.ts`, `.gitignore`, `src/index.ts`, `src/index.test.ts`
+- Create: `package.json`, `tsconfig.json`, `tsdown.config.ts`, `vitest.config.ts`, `.gitignore`, `src/index.ts`, `src/index.test.ts`
 
 **Interfaces:**
 - Consumes: nothing.
@@ -96,7 +96,7 @@ describe('package', () => {
   "types": "./dist/index.d.ts",
   "files": ["dist"],
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
@@ -106,7 +106,7 @@ describe('package', () => {
     "saxes": "6.0.0"
   },
   "devDependencies": {
-    "tsup": "8.5.1",
+    "tsdown": "0.22.3",
     "typescript": "5.7.2",
     "vitest": "4.1.9"
   }
@@ -132,9 +132,9 @@ describe('package', () => {
 }
 ```
 
-`tsup.config.ts`
+`tsdown.config.ts`
 ```ts
-import { defineConfig } from 'tsup'
+import { defineConfig } from 'tsdown'
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -142,6 +142,9 @@ export default defineConfig({
   dts: true,
   clean: true,
   target: 'es2022',
+  // Emit .js/.d.ts (not .mjs/.d.mts) so the package "exports" contract is
+  // stable; valid ESM because the package is "type": "module".
+  fixedExtension: false,
 })
 ```
 
@@ -179,7 +182,7 @@ Expected: PASS — 1 test passing.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add package.json package-lock.json tsconfig.json tsup.config.ts vitest.config.ts .gitignore src/index.ts src/index.test.ts
+git add package.json package-lock.json tsconfig.json tsdown.config.ts vitest.config.ts .gitignore src/index.ts src/index.test.ts
 git commit -m "chore: scaffold epubcheck-ts ESM package"
 ```
 
@@ -1146,7 +1149,7 @@ Each is written when reached, follows this same TDD/commit structure, and extend
 
 ## Self-Review
 
-**Spec coverage (Plan 1 portion):** §3 pipeline → Task 7; §4 layout → Tasks 1–7 (OCF slice); §5 types `Severity`/`Location`/`Message`/`Report`/`XmlNode`/`EpubContainer`/`Resource` → Tasks 2–5; §6 catalog+`msg` → Task 2; §7 API (`validateEpub`, `openEpub`, `getResource`, `validateOcf`, `parseXml`, type re-exports) → Tasks 5–7; §8 short-circuit/never-throw → Task 7; §10 Vitest + colocated unit + integration → all tasks + Task 7; §11 ESM/tsup/deps → Task 1. OPF/nav/content (§2 layers 2–4) and §9/§12 deferred to Plans 2–5 (roadmap). No Plan-1 gaps.
+**Spec coverage (Plan 1 portion):** §3 pipeline → Task 7; §4 layout → Tasks 1–7 (OCF slice); §5 types `Severity`/`Location`/`Message`/`Report`/`XmlNode`/`EpubContainer`/`Resource` → Tasks 2–5; §6 catalog+`msg` → Task 2; §7 API (`validateEpub`, `openEpub`, `getResource`, `validateOcf`, `parseXml`, type re-exports) → Tasks 5–7; §8 short-circuit/never-throw → Task 7; §10 Vitest + colocated unit + integration → all tasks + Task 7; §11 ESM/tsdown/deps → Task 1. OPF/nav/content (§2 layers 2–4) and §9/§12 deferred to Plans 2–5 (roadmap). No Plan-1 gaps.
 
 **Placeholder scan:** No TBD/TODO; every code step shows complete code; the only comments describing future work are in the roadmap section and the documented orchestration seam, not in place of implementation.
 
