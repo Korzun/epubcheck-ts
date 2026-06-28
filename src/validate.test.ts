@@ -19,4 +19,22 @@ describe('validateEpub', () => {
     const ids = report.messages.map((m) => m.id)
     expect(ids).toContain('PKG-006')
   })
+
+  it('runs OPF checks and reports the detected version', async () => {
+    const opf =
+      '<package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" version="3.0" unique-identifier="uid">' +
+      '<metadata><dc:identifier id="uid">u</dc:identifier><dc:title>T</dc:title><dc:language>en</dc:language>' +
+      '<meta property="dcterms:modified">2020-01-01T00:00:00Z</meta></metadata>' +
+      '<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest>' +
+      '<spine><itemref idref="missing"/></spine></package>'
+    const bytes = zipSync({
+      mimetype: [enc('application/epub+zip'), { level: 0 }],
+      'META-INF/container.xml': [enc('<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>'), { level: 6 }],
+      'package.opf': [enc(opf), { level: 6 }],
+      'nav.xhtml': [enc('<html/>'), { level: 6 }],
+    })
+    const report = await validateEpub(bytes)
+    expect(report.epubVersion).toBe('3.0')
+    expect(report.messages.map((m) => m.id)).toContain('OPF-049') // idref "missing"
+  })
 })
