@@ -1,0 +1,68 @@
+import { describe, it, expect } from 'vitest'
+import type { EpubContainer, Resource } from '../io/zip.js'
+import { parseOpf } from './opf.js'
+
+const enc = (s: string) => new TextEncoder().encode(s)
+
+function container(opfXml: string | undefined, opfPath = 'EPUB/package.opf'): EpubContainer {
+  const resources = new Map<string, Resource>()
+  if (opfXml !== undefined) {
+    resources.set(opfPath, { path: opfPath, bytes: enc(opfXml), compression: 'deflate' })
+  }
+  return { resources, rootfiles: opfXml === undefined ? [] : [opfPath], hasEncryption: false }
+}
+
+const PKG = (inner: string, attrs = 'version="3.0" unique-identifier="uid"') =>
+  `<package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" ${attrs}>${inner}</package>`
+
+const META =
+  '<metadata>' +
+  '<dc:identifier id="uid">urn:isbn:123</dc:identifier>' +
+  '<dc:title>T</dc:title><dc:language>en</dc:language>' +
+  '<meta property="dcterms:modified">2020-01-01T00:00:00Z</meta>' +
+  '</metadata>'
+
+describe('parseOpf', () => {
+  it('parses version, unique-identifier and metadata', () => {
+    const { pkg, messages } = parseOpf(
+      container(PKG(META + '<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest><spine><itemref idref="nav"/></spine>')),
+    )
+    expect(messages).toHaveLength(0)
+    expect(pkg?.version).toBe('3.0')
+    expect(pkg?.uniqueIdentifier).toBe('uid')
+    expect(pkg?.metadata.identifiers).toEqual([{ id: 'uid', value: 'urn:isbn:123' }])
+    expect(pkg?.metadata.titles).toEqual(['T'])
+    expect(pkg?.metadata.languages).toEqual(['en'])
+    expect(pkg?.metadata.modifiedCount).toBe(1)
+  })
+
+  it('parses manifest items with properties and spine itemrefs', () => {
+    const { pkg } = parseOpf(
+      container(PKG(META + '<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c1"/><itemref idref="nav" linear="no"/></spine>')),
+    )
+    expect(pkg?.manifest).toHaveLength(2)
+    expect(pkg?.manifest[0]?.properties).toEqual(['nav'])
+    expect(pkg?.spine).toHaveLength(2)
+    expect(pkg?.spine[0]?.idref).toBe('c1')
+    expect(pkg?.spine[0]?.linear).toBe(true)
+    expect(pkg?.spine[1]?.linear).toBe(false)
+    expect(pkg?.spinePresent).toBe(true)
+  })
+
+  it('reports RSC-001 when the rootfile OPF resource is missing', () => {
+    const c: EpubContainer = { resources: new Map(), rootfiles: ['EPUB/package.opf'], hasEncryption: false }
+    const { pkg, messages } = parseOpf(c)
+    expect(pkg).toBeUndefined()
+    expect(messages[0]?.id).toBe('RSC-001')
+  })
+
+  it('returns no pkg and no messages when there is no rootfile', () => {
+    expect(parseOpf(container(undefined))).toEqual({ messages: [] })
+  })
+
+  it('surfaces a parse error as RSC-005', () => {
+    const { pkg, messages } = parseOpf(container('<package><metadata></package>'))
+    expect(pkg).toBeUndefined()
+    expect(messages[0]?.id).toBe('RSC-005')
+  })
+})

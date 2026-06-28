@@ -1,0 +1,47 @@
+import { describe, it, expect } from 'vitest'
+import { zipSync } from 'fflate'
+import { validateEpub } from '../../src/index.js'
+
+const enc = (s: string) => new TextEncoder().encode(s)
+
+const CONTAINER = enc(
+  '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">' +
+    '<rootfiles><rootfile full-path="EPUB/package.opf" media-type="application/oebps-package+xml"/></rootfiles>' +
+    '</container>',
+)
+
+function epub(opf: string, files: Record<string, Uint8Array> = {}) {
+  return zipSync({
+    mimetype: [enc('application/epub+zip'), { level: 0 }],
+    'META-INF/container.xml': [CONTAINER, { level: 6 }],
+    'EPUB/package.opf': [enc(opf), { level: 6 }],
+    ...Object.fromEntries(Object.entries(files).map(([k, v]) => [k, [v, { level: 6 }] as [Uint8Array, { level: 6 }]])),
+  })
+}
+
+const VALID_OPF =
+  '<package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" version="3.0" unique-identifier="uid">' +
+  '<metadata><dc:identifier id="uid">urn:isbn:1</dc:identifier><dc:title>T</dc:title><dc:language>en</dc:language>' +
+  '<meta property="dcterms:modified">2020-01-01T00:00:00Z</meta></metadata>' +
+  '<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest>' +
+  '<spine><itemref idref="nav"/></spine></package>'
+
+describe('integration: OPF validation', () => {
+  it('reports no OPF errors for a valid EPUB 3 package', async () => {
+    const report = await validateEpub(epub(VALID_OPF, { 'EPUB/nav.xhtml': enc('<html/>') }))
+    const opfIds = report.messages.map((m) => m.id).filter((id) => id.startsWith('OPF') || id === 'RSC-001' || id === 'RSC-005')
+    expect(opfIds).toEqual([])
+    expect(report.epubVersion).toBe('3.0')
+  })
+
+  it('flags a manifest item whose file is missing', async () => {
+    // Add a manifest item pointing at a file that is not in the container.
+    const opf = VALID_OPF.replace(
+      '</manifest>',
+      '<item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest>',
+    )
+    const report = await validateEpub(epub(opf, { 'EPUB/nav.xhtml': enc('<html/>') }))
+    expect(report.messages.map((m) => m.id)).toContain('RSC-001')
+    expect(report.valid).toBe(false)
+  })
+})
