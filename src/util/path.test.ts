@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { resolvePath } from './path.js'
+import { isRemote } from './path.js'
 
 describe('resolvePath', () => {
   it('resolves a sibling-dir href relative to the OPF', () => {
@@ -22,5 +23,17 @@ describe('resolvePath', () => {
   })
   it('treats a leading slash as container-root-relative', () => {
     expect(resolvePath('EPUB/package.opf', '/EPUB/c1.xhtml')).toBe('EPUB/c1.xhtml')
+  })
+})
+
+describe('isRemote', () => {
+  it('detects scheme-based remote urls', () => {
+    expect(isRemote('https://example.com/x')).toBe(true)
+    expect(isRemote('http://example.com/x')).toBe(true)
+    expect(isRemote('data:image/png;base64,AAA')).toBe(false) // no //
+  })
+  it('treats relative paths as local', () => {
+    expect(isRemote('chapter.xhtml')).toBe(false)
+    expect(isRemote('../img/a.png')).toBe(false)
   })
 })

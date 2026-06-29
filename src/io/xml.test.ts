@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseXml, findDescendants, childElements } from './xml.js'
+import { textContent } from './xml.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 
@@ -27,5 +28,12 @@ describe('parseXml', () => {
     expect(root).toBeUndefined()
     expect(messages[0]?.id).toBe('RSC-005')
     expect(messages[0]?.location?.path).toBe('bad.xml')
+  })
+})
+
+describe('textContent', () => {
+  it('concatenates nested text', () => {
+    const { root } = parseXml(new TextEncoder().encode('<a>Hello <b>World</b>!</a>'), 'm.xml')
+    expect(textContent(root!)).toBe('Hello World!')
   })
 })

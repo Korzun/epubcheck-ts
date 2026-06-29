@@ -84,3 +84,16 @@ export function findDescendants(node: XmlNode, localName: string): XmlNode[] {
   walk(node)
   return out
 }
+
+/** All descendant text content of a node, concatenated (not trimmed). */
+export function textContent(node: XmlNode): string {
+  let out = ''
+  const walk = (n: XmlNode) => {
+    for (const child of n.children ?? []) {
+      if (child.type === 'text') out += child.text ?? ''
+      else walk(child)
+    }
+  }
+  walk(node)
+  return out
+}

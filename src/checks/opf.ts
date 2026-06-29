@@ -1,5 +1,5 @@
 import { getResource, type EpubContainer } from '../io/zip.js'
-import { resolvePath } from '../util/path.js'
+import { resolvePath, isRemote } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
 import type { PackageDocument } from '../parse/opf.js'
 
@@ -42,10 +42,6 @@ function checkPackage(pkg: PackageDocument): Message[] {
   }
 
   return messages
-}
-
-function isRemote(href: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:\/\//i.test(href)
 }
 
 function checkManifest(pkg: PackageDocument, container: EpubContainer): Message[] {

@@ -26,3 +26,8 @@ export function resolvePath(fromFile: string, href: string): string {
   }
   return stack.join('/')
 }
+
+/** True when `href` is an absolute URL with a scheme (e.g. https://…). */
+export function isRemote(href: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(href)
+}
