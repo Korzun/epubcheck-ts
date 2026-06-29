@@ -66,3 +66,23 @@ describe('parseOpf', () => {
     expect(messages[0]?.id).toBe('RSC-005')
   })
 })
+
+import { manifestPathMap } from './opf.js'
+
+describe('manifestPathMap', () => {
+  it('maps resolved container paths to manifest items (non-remote)', () => {
+    const loc = { path: 'EPUB/package.opf' }
+    const pkg = {
+      path: 'EPUB/package.opf', version: '3.0' as const, uniqueIdentifier: 'u',
+      metadata: { identifiers: [], titles: [], languages: [], modifiedCount: 1 },
+      manifest: [
+        { id: 'a', href: 'x/a.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc },
+        { id: 'r', href: 'https://example.com/r.png', mediaType: 'image/png', properties: [], loc },
+      ],
+      spinePresent: true, spine: [], loc,
+    }
+    const map = manifestPathMap(pkg)
+    expect(map.get('EPUB/x/a.xhtml')?.id).toBe('a')
+    expect([...map.keys()]).not.toContain('https://example.com/r.png') // remote excluded
+  })
+})

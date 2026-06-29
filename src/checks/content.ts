@@ -1,31 +1,17 @@
 import { parseContent, type ContentDocument, type RefType } from '../parse/content.js'
 import { getResource, type EpubContainer } from '../io/zip.js'
-import { resolvePath, isRemote } from '../util/path.js'
+import { resolvePath, isRemote, hasScheme } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
-import type { ManifestItem, PackageDocument } from '../parse/opf.js'
+import { manifestPathMap, type ManifestItem, type PackageDocument } from '../parse/opf.js'
 import type { XmlNode } from '../io/xml.js'
 import { isKnownHtmlElement } from '../util/html-elements.js'
 
 const REMOTE_ALLOWED: ReadonlySet<RefType> = new Set<RefType>(['hyperlink', 'cite', 'audio', 'video'])
 const HTML_NS = 'http://www.w3.org/1999/xhtml'
 
-/** A URL carrying any scheme (https:, data:, mailto:, tel:, …). */
-function hasScheme(url: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:/i.test(url)
-}
-
-/** Map of resolved-container-path → manifest item, for declared local resources. */
-function resolvedManifest(pkg: PackageDocument): Map<string, ManifestItem> {
-  const map = new Map<string, ManifestItem>()
-  for (const item of pkg.manifest) {
-    if (item.href && !isRemote(item.href)) map.set(resolvePath(pkg.path, item.href), item)
-  }
-  return map
-}
-
 export function validateContentDocs(pkg: PackageDocument, container: EpubContainer): Message[] {
   const messages: Message[] = []
-  const manifest = resolvedManifest(pkg)
+  const manifest = manifestPathMap(pkg)
 
   // Parse every XHTML content doc except the nav doc (validated by validateNav).
   const docs = new Map<string, ContentDocument>()

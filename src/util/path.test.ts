@@ -37,3 +37,18 @@ describe('isRemote', () => {
     expect(isRemote('../img/a.png')).toBe(false)
   })
 })
+
+import { hasScheme } from './path.js'
+
+describe('hasScheme', () => {
+  it('detects any url scheme', () => {
+    expect(hasScheme('https://x')).toBe(true)
+    expect(hasScheme('data:text/css,a')).toBe(true)
+    expect(hasScheme('mailto:a@b.com')).toBe(true)
+  })
+  it('treats relative paths as scheme-less', () => {
+    expect(hasScheme('a/b.css')).toBe(false)
+    expect(hasScheme('../x.png')).toBe(false)
+    expect(hasScheme('#frag')).toBe(false)
+  })
+})
