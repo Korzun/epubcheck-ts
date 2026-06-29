@@ -58,4 +58,26 @@ describe('validateEpub', () => {
     const report = await validateEpub(bytes)
     expect(report.messages.map((m) => m.id)).toContain('RSC-007')
   })
+
+  it('runs content checks for an EPUB 3 package', async () => {
+    const opf =
+      '<package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" version="3.0" unique-identifier="uid">' +
+      '<metadata><dc:identifier id="uid">u</dc:identifier><dc:title>T</dc:title><dc:language>en</dc:language>' +
+      '<meta property="dcterms:modified">2020-01-01T00:00:00Z</meta></metadata>' +
+      '<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>' +
+      '<item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest>' +
+      '<spine><itemref idref="c1"/></spine></package>'
+    const nav = '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>t</title></head><body><nav epub:type="toc"><ol><li><a href="c1.xhtml">One</a></li></ol></nav></body></html>'
+    // c1 references an image that is not in the archive -> RSC-007
+    const c1 = '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body><img src="missing.png"/></body></html>'
+    const bytes = zipSync({
+      mimetype: [enc('application/epub+zip'), { level: 0 }],
+      'META-INF/container.xml': [enc('<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>'), { level: 6 }],
+      'package.opf': [enc(opf), { level: 6 }],
+      'nav.xhtml': [enc(nav), { level: 6 }],
+      'c1.xhtml': [enc(c1), { level: 6 }],
+    })
+    const report = await validateEpub(bytes)
+    expect(report.messages.map((m) => m.id)).toContain('RSC-007')
+  })
 })
