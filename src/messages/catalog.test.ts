@@ -28,6 +28,17 @@ describe('CATALOG', () => {
     expect(CATALOG['RSC-001']?.template).toContain('%1$s')
   })
 
+  it('defines content-reference message ids', () => {
+    expect(CATALOG['RSC-010']).toEqual({
+      severity: 'ERROR',
+      template: 'Reference to non-standard resource type found.',
+    })
+    expect(CATALOG['RSC-011']).toEqual({
+      severity: 'ERROR',
+      template: 'Found a reference to a resource that is not a spine item.',
+    })
+  })
+
   it('defines navigation message ids with severities', () => {
     expect(CATALOG['RSC-007']?.severity).toBe('ERROR')
     expect(CATALOG['RSC-008']?.severity).toBe('ERROR')
