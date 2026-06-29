@@ -12,7 +12,25 @@ export function validateCssDocs(pkg: PackageDocument, container: EpubContainer):
     if (item.mediaType !== 'text/css') continue
     const { css, messages: m } = parseCss(item, container)
     messages.push(...m)
-    if (css) messages.push(...checkReferences(css, container, manifest))
+    if (css) {
+      messages.push(...checkReferences(css, container, manifest))
+      messages.push(...checkProperties(css))
+    }
+  }
+  return messages
+}
+
+function checkProperties(css: CssDocument): Message[] {
+  const messages: Message[] = []
+  for (const decl of css.declarations) {
+    if (decl.property === 'direction' || decl.property === 'unicode-bidi') {
+      messages.push(msg('CSS-001', decl.loc, decl.property))
+    } else if (decl.property === 'position' && /\bfixed\b/i.test(decl.value)) {
+      messages.push(msg('CSS-006', decl.loc))
+    }
+  }
+  for (const fontFace of css.fontFaces) {
+    if (fontFace.declarationCount === 0) messages.push(msg('CSS-019', fontFace.loc))
   }
   return messages
 }

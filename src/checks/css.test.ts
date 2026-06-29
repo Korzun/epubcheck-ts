@@ -51,3 +51,19 @@ describe('validateCssDocs — references', () => {
     expect(ids('@import "base.css#x";', { present: ['base.css'], declared: ['base.css'] })).toContain('RSC-013')
   })
 })
+
+describe('validateCssDocs — properties', () => {
+  it('CSS-001 for direction / unicode-bidi', () => {
+    expect(ids('p { direction: rtl; }')).toContain('CSS-001')
+    expect(ids('p { unicode-bidi: bidi-override; }')).toContain('CSS-001')
+  })
+  it('CSS-006 for position: fixed', () => {
+    expect(ids('div { position: fixed; }')).toContain('CSS-006')
+  })
+  it('does not flag position: absolute', () => {
+    expect(ids('div { position: absolute; }')).not.toContain('CSS-006')
+  })
+  it('CSS-019 for an empty @font-face', () => {
+    expect(ids('@font-face {}')).toContain('CSS-019')
+  })
+})
