@@ -55,4 +55,11 @@ describe('CATALOG', () => {
     expect(CATALOG['RSC-030']?.severity).toBe('ERROR')
     expect(CATALOG['RSC-031']?.severity).toBe('WARNING')
   })
+
+  it('defines manifest-completeness message ids', () => {
+    expect(CATALOG['OPF-003']?.severity).toBe('USAGE')
+    expect(CATALOG['PKG-001']?.severity).toBe('WARNING')
+    expect(CATALOG['OPF-003']?.template).toContain('%1$s')
+    expect(CATALOG['PKG-001']?.template).toContain('%2$s')
+  })
 })

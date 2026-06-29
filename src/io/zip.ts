@@ -81,8 +81,9 @@ export async function openEpub(
 
   const resources = new Map<string, Resource>()
   for (const { name, method } of order) {
+    if (name.endsWith('/')) continue // ZIP directory entry — never a resource
     const data = content[name]
-    if (!data) continue // directory entry or unsupported; skip
+    if (!data) continue // unsupported or missing entry; skip
     resources.set(name, {
       path: name,
       bytes: data,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { EpubContainer, Resource } from '../io/zip.js'
 import type { PackageDocument, ManifestItem, SpineItem } from '../parse/opf.js'
-import { validateOpf } from './opf.js'
+import { validateOpf, checkUndeclaredResources } from './opf.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 const LOC = { path: 'EPUB/package.opf', line: 1, column: 1 }
@@ -121,5 +121,36 @@ describe('validateOpf — spine and nav', () => {
   it('RSC-005 when the nav item is not XHTML', () => {
     const pkg = validPkg({ manifest: [{ ...navItem, mediaType: 'text/html' }] })
     expect(validateOpf(pkg, c).some((m) => m.id === 'RSC-005' && m.message.includes('Navigation Document'))).toBe(true)
+  })
+})
+
+describe('checkUndeclaredResources', () => {
+  const LOC2 = { path: 'EPUB/package.opf' }
+  function pkgWith(): PackageDocument {
+    return {
+      path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
+      metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
+      manifest: [{ id: 'nav', href: 'nav.xhtml', mediaType: 'application/xhtml+xml', properties: ['nav'], loc: LOC2 }],
+      spinePresent: true, spine: [], loc: LOC2,
+    }
+  }
+  function containerWith(paths: string[]): EpubContainer {
+    const resources = new Map<string, Resource>()
+    for (const p of paths) resources.set(p, { path: p, bytes: enc(''), compression: 'deflate' })
+    return { resources, rootfiles: ['EPUB/package.opf'], hasEncryption: false }
+  }
+
+  it('OPF-003 for a container file not declared in the manifest', () => {
+    const msgs = checkUndeclaredResources(pkgWith(), containerWith(['EPUB/nav.xhtml', 'EPUB/orphan.txt']))
+    expect(msgs.map((m) => m.id)).toEqual(['OPF-003'])
+    expect(msgs[0]?.severity).toBe('USAGE')
+  })
+
+  it('does not flag mimetype, META-INF/*, the rootfile OPF, or declared items', () => {
+    const msgs = checkUndeclaredResources(
+      pkgWith(),
+      containerWith(['mimetype', 'META-INF/container.xml', 'META-INF/encryption.xml', 'EPUB/package.opf', 'EPUB/nav.xhtml']),
+    )
+    expect(msgs).toEqual([])
   })
 })

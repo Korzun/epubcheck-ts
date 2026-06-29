@@ -1,7 +1,7 @@
 import { openEpub } from './io/zip.js'
 import { validateOcf } from './checks/ocf.js'
 import { parseOpf } from './parse/opf.js'
-import { validateOpf } from './checks/opf.js'
+import { validateOpf, checkUndeclaredResources } from './checks/opf.js'
 import { parseNav } from './parse/nav.js'
 import { validateNav } from './checks/nav.js'
 import { validateContentDocs } from './checks/content.js'
@@ -31,8 +31,14 @@ export async function validateEpub(
     let detectedVersion: '2.0' | '3.0' | undefined
     if (pkg) {
       messages.push(...validateOpf(pkg, container))
+      messages.push(...checkUndeclaredResources(pkg, container))
+
       if (pkg.version === '2.0') detectedVersion = '2.0'
       else if (pkg.version === '3.0') detectedVersion = '3.0'
+
+      if (options.version && detectedVersion && options.version !== detectedVersion) {
+        messages.push(msg('PKG-001', pkg.loc, options.version, detectedVersion))
+      }
 
       // Navigation Document (EPUB 3 only).
       if (detectedVersion === '3.0') {

@@ -43,4 +43,17 @@ describe('openEpub', () => {
     const c = await openEpub(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
     expect(c.resources.has('mimetype')).toBe(true)
   })
+
+  it('excludes ZIP directory entries from resources', async () => {
+    const bytes = zipSync({
+      mimetype: [enc('application/epub+zip'), { level: 0 }],
+      'EPUB/': [new Uint8Array(0), { level: 0 }], // explicit directory entry
+      'EPUB/content.xhtml': [enc('<html/>'), { level: 6 }],
+      'EPUB/empty.css': [new Uint8Array(0), { level: 0 }], // empty but real file — must be retained
+    })
+    const c = await openEpub(bytes)
+    expect(c.resources.has('EPUB/content.xhtml')).toBe(true)
+    expect(c.resources.has('EPUB/empty.css')).toBe(true) // empty file kept (key on slash, not length)
+    expect(c.resources.has('EPUB/')).toBe(false) // directory entry excluded
+  })
 })
