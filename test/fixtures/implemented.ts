@@ -7,7 +7,7 @@ export const IMPLEMENTED_IDS: ReadonlySet<string> = new Set([
   // package document
   'OPF-001', 'OPF-003', 'OPF-030', 'OPF-033', 'OPF-048', 'OPF-049', 'OPF-074',
   // navigation
-  'NAV-010',
+  'NAV-010', 'NAV-011',
   // css
   'CSS-001', 'CSS-002', 'CSS-006', 'CSS-008', 'CSS-019',
   // internal
