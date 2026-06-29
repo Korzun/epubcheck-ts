@@ -1,4 +1,4 @@
-import { findDescendants } from '../io/xml.js'
+import { findDescendants, textContent } from '../io/xml.js'
 import type { EpubContainer } from '../io/zip.js'
 import { msg, type Message } from '../messages/format.js'
 import type { NavDocument, NavSection } from '../parse/nav.js'
@@ -13,7 +13,7 @@ export function validateNav(
   _pkg: PackageDocument,
   _container: EpubContainer,
 ): Message[] {
-  return [...checkOccurrence(nav)]
+  return [...checkOccurrence(nav), ...checkContent(nav)]
 }
 
 function checkOccurrence(nav: NavDocument): Message[] {
@@ -33,6 +33,49 @@ function checkOccurrence(nav: NavDocument): Message[] {
   const toc = tocs[0]
   if (toc && findDescendants(toc.node, 'ol').length === 0) {
     messages.push(msg('RSC-005', toc.loc, nav.path, 'The "toc" nav element must contain an ol element.'))
+  }
+
+  return messages
+}
+
+function checkContent(nav: NavDocument): Message[] {
+  const messages: Message[] = []
+
+  for (const section of nav.sections) {
+    const anchors = findDescendants(section.node, 'a')
+
+    for (const a of anchors) {
+      if (!a.attrs?.['href']) {
+        messages.push(msg('RSC-005', a.loc, nav.path, 'An "a" element in the navigation document must have an href attribute.'))
+      }
+      if (textContent(a).trim() === '') {
+        messages.push(msg('RSC-005', a.loc, nav.path, 'Anchors within nav elements must contain text.'))
+      }
+    }
+
+    for (const span of findDescendants(section.node, 'span')) {
+      if (textContent(span).trim() === '') {
+        messages.push(msg('RSC-005', span.loc, nav.path, 'Spans within nav elements must contain text.'))
+      }
+    }
+
+    if (hasType(section, 'landmarks')) {
+      const seen = new Set<string>()
+      for (const a of anchors) {
+        const type = a.attrs?.['epub:type']
+        if (!type) {
+          messages.push(msg('RSC-005', a.loc, nav.path, 'Missing epub:type attribute on anchor inside "landmarks" nav element.'))
+          continue
+        }
+        const href = a.attrs?.['href'] ?? ''
+        const key = `${type}::${href}`
+        if (seen.has(key)) {
+          messages.push(msg('RSC-005', a.loc, nav.path, `Another landmark was found with the same epub:type and reference to "${href}".`))
+        } else {
+          seen.add(key)
+        }
+      }
+    }
   }
 
   return messages

@@ -57,3 +57,30 @@ describe('validateNav — occurrence', () => {
       .some((m) => m.id === 'RSC-005' && m.message.includes('ol element'))).toBe(true)
   })
 })
+
+describe('validateNav — content', () => {
+  it('RSC-005 when an anchor has no href', () => {
+    expect(msgs('<nav epub:type="toc"><ol><li><a>No link</a></li></ol></nav>')
+      .some((m) => m.id === 'RSC-005' && m.message.includes('href attribute'))).toBe(true)
+  })
+  it('RSC-005 when an anchor has empty text', () => {
+    expect(msgs('<nav epub:type="toc"><ol><li><a href="c1.xhtml"></a></li></ol></nav>')
+      .some((m) => m.id === 'RSC-005' && m.message.includes('Anchors within nav'))).toBe(true)
+  })
+  it('RSC-005 when a span has empty text', () => {
+    expect(msgs('<nav epub:type="toc"><ol><li><span></span><ol><li><a href="c1.xhtml">x</a></li></ol></li></ol></nav>')
+      .some((m) => m.id === 'RSC-005' && m.message.includes('Spans within nav'))).toBe(true)
+  })
+  it('RSC-005 when a landmarks anchor has no epub:type', () => {
+    const body = '<nav epub:type="toc"><ol><li><a href="c1.xhtml">x</a></li></ol></nav>' +
+      '<nav epub:type="landmarks"><ol><li><a href="c1.xhtml">Start</a></li></ol></nav>'
+    expect(msgs(body).some((m) => m.id === 'RSC-005' && m.message.includes('Missing epub:type'))).toBe(true)
+  })
+  it('RSC-005 on duplicate landmark epub:type + href', () => {
+    const body = '<nav epub:type="toc"><ol><li><a href="c1.xhtml">x</a></li></ol></nav>' +
+      '<nav epub:type="landmarks"><ol>' +
+      '<li><a epub:type="bodymatter" href="c1.xhtml">A</a></li>' +
+      '<li><a epub:type="bodymatter" href="c1.xhtml">B</a></li></ol></nav>'
+    expect(msgs(body).some((m) => m.id === 'RSC-005' && m.message.includes('Another landmark'))).toBe(true)
+  })
+})
