@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { EpubContainer, Resource } from '../io/zip.js'
 import type { ManifestItem } from './opf.js'
-import { parseCss } from './css.js'
-import { analyzeCss } from './css.js'
+import { parseCss, analyzeCss } from './css.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 const LOC = { path: 'EPUB/package.opf' }

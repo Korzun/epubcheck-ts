@@ -26,6 +26,7 @@ export interface CssDocument {
   fontFaces: FontFace[]
 }
 export interface CssAnalysis {
+  parsed: boolean
   refs: CssRef[]
   declarations: CssDeclaration[]
   fontFaces: FontFace[]
@@ -97,7 +98,7 @@ export function analyzeCss(
     })
   } catch (error) {
     messages.push(msg('CSS-008', { path }, error instanceof Error ? error.message : String(error)))
-    return { refs, declarations, fontFaces, messages }
+    return { parsed: false, refs, declarations, fontFaces, messages }
   }
 
   const atruleStack: string[] = []
@@ -134,7 +135,7 @@ export function analyzeCss(
     },
   })
 
-  return { refs, declarations, fontFaces, messages }
+  return { parsed: true, refs, declarations, fontFaces, messages }
 }
 
 export function parseCss(
@@ -150,5 +151,6 @@ export function parseCss(
 
   const text = new TextDecoder('utf-8').decode(resource.bytes)
   const a = analyzeCss(text, path, 'stylesheet')
+  if (!a.parsed) return { messages: a.messages }
   return { css: { path, refs: a.refs, declarations: a.declarations, fontFaces: a.fontFaces }, messages: a.messages }
 }
