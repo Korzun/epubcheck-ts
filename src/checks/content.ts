@@ -11,9 +11,48 @@ import { validateCss } from './css.js'
 const REMOTE_ALLOWED: ReadonlySet<RefType> = new Set<RefType>(['hyperlink', 'cite', 'audio', 'video'])
 const HTML_NS = 'http://www.w3.org/1999/xhtml'
 
+const BLESSED_CONTENT_TYPES: ReadonlySet<string> = new Set<string>([
+  'application/xhtml+xml',
+  'image/svg+xml',
+  'application/x-dtbncx+xml', // deprecated-blessed
+  'application/x-dtbook+xml', // deprecated-blessed
+])
+
+function isBlessedContentType(mediaType: string | undefined): boolean {
+  return mediaType !== undefined && BLESSED_CONTENT_TYPES.has(mediaType)
+}
+
+// Walk the manifest `fallback` chain (each fallback is a manifest item id) and
+// report whether any item in the chain is a blessed content-document type.
+function hasFallbackToBlessed(item: ManifestItem, byId: Map<string, ManifestItem>): boolean {
+  const seen = new Set<string>()
+  let current = item.fallback
+  while (current !== undefined && !seen.has(current)) {
+    seen.add(current)
+    const next = byId.get(current)
+    if (next === undefined) return false
+    if (isBlessedContentType(next.mediaType)) return true
+    current = next.fallback
+  }
+  return false
+}
+
+function inSpine(item: ManifestItem, spineIdrefs: ReadonlySet<string>): boolean {
+  return item.id !== undefined && spineIdrefs.has(item.id)
+}
+
 export function validateContentDocs(pkg: PackageDocument, container: EpubContainer): Message[] {
   const messages: Message[] = []
   const manifest = manifestPathMap(pkg)
+
+  const byId = new Map<string, ManifestItem>()
+  for (const item of pkg.manifest) {
+    if (item.id !== undefined) byId.set(item.id, item)
+  }
+  const spineIdrefs = new Set<string>()
+  for (const s of pkg.spine) {
+    if (s.idref !== undefined) spineIdrefs.add(s.idref)
+  }
 
   // Parse every XHTML content doc except the nav doc (validated by validateNav).
   const docs = new Map<string, ContentDocument>()
@@ -26,7 +65,7 @@ export function validateContentDocs(pkg: PackageDocument, container: EpubContain
   }
 
   for (const doc of docs.values()) {
-    messages.push(...checkReferences(doc, container, manifest))
+    messages.push(...checkReferences(doc, container, manifest, byId, spineIdrefs))
     messages.push(...checkFragments(doc, docs, manifest))
     messages.push(...checkElements(doc))
     for (const style of doc.inlineStyles) {
@@ -99,6 +138,8 @@ function checkReferences(
   doc: ContentDocument,
   container: EpubContainer,
   manifest: Map<string, ManifestItem>,
+  byId: Map<string, ManifestItem>,
+  spineIdrefs: ReadonlySet<string>,
 ): Message[] {
   const messages: Message[] = []
   for (const ref of doc.refs) {
@@ -114,6 +155,15 @@ function checkReferences(
       messages.push(msg('RSC-007', ref.loc, url))
     } else if (!manifest.has(target)) {
       messages.push(msg('RSC-008', ref.loc, url))
+    } else if (ref.type === 'hyperlink') {
+      const item = manifest.get(target)
+      if (item) {
+        if (!isBlessedContentType(item.mediaType) && !hasFallbackToBlessed(item, byId)) {
+          messages.push(msg('RSC-010', ref.loc))
+        } else if (!inSpine(item, spineIdrefs)) {
+          messages.push(msg('RSC-011', ref.loc))
+        }
+      }
     }
   }
   return messages

@@ -186,6 +186,30 @@ export const CORPUS: Fixture[] = [
     epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><a href="#nope">x</a></p>') } }),
     expected: [E('RSC-012', 'ERROR')],
   },
+  {
+    name: 'content-link-nonstandard-type',
+    area: 'content',
+    description: 'content a@href targets a non-content-document resource type (epubcheck RSC-010)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace(
+          '</manifest>',
+          '<item id="photo" href="photo.jpg" media-type="image/jpeg"/></manifest>',
+        ),
+        'EPUB/photo.jpg': 'JPEGDATA',
+        'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><a href="photo.jpg">x</a></p>'),
+      },
+    }),
+    expected: [E('RSC-010', 'ERROR')],
+  },
+  {
+    name: 'content-link-nonspine',
+    area: 'content',
+    description: 'content a@href targets a content doc that is not a spine item (epubcheck RSC-011)',
+    // The nav doc is a declared XHTML resource that is not in the spine.
+    epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><a href="nav.xhtml">x</a></p>') } }),
+    expected: [E('RSC-011', 'ERROR')],
+  },
 
   // ---- CSS (mirrors epub3/06-content-document css scenarios) ----
   { name: 'css-valid', area: 'css', description: 'valid EPUB with a stylesheet', epub: cssEpub('p { color: red; }'), expected: [] },

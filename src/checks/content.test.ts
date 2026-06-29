@@ -23,7 +23,10 @@ function setup(docs: Record<string, string>, extras: string[] = []): { pkg: Pack
   const pkg: PackageDocument = {
     path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
     metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
-    manifest, spinePresent: true, spine: [], loc: LOC,
+    manifest,
+    spinePresent: true,
+    spine: manifest.map((m) => ({ idref: m.id, linear: true, properties: [], loc: LOC })),
+    loc: LOC,
   }
   return { pkg, container }
 }
@@ -94,5 +97,44 @@ describe('validateContentDocs — inline CSS', () => {
   })
   it('CSS-001 for direction in a <style> element', () => {
     expect(ids({ 'c1.xhtml': '<style>p { direction: rtl; }</style>' })).toContain('CSS-001')
+  })
+})
+
+describe('validateContentDocs — hyperlink targets', () => {
+  it('RSC-010 for a hyperlink to a non-content-document resource type', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<a href="photo.jpg">x</a>' })
+    pkg.manifest.push({ id: 'photo', href: 'photo.jpg', mediaType: 'image/jpeg', properties: [], loc: LOC })
+    container.resources.set('EPUB/photo.jpg', { path: 'EPUB/photo.jpg', bytes: enc('x'), compression: 'deflate' })
+    const out = validateContentDocs(pkg, container).map((m) => m.id)
+    expect(out).toContain('RSC-010')
+    expect(out).not.toContain('RSC-011')
+  })
+
+  it('RSC-011 for a hyperlink to a content document that is not in the spine', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<a href="c2.xhtml">x</a>' })
+    // c2 is a declared, present XHTML doc, but is intentionally NOT added to the spine.
+    pkg.manifest.push({ id: 'c2', href: 'c2.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC })
+    container.resources.set('EPUB/c2.xhtml', { path: 'EPUB/c2.xhtml', bytes: enc(DOC('<p>2</p>')), compression: 'deflate' })
+    const out = validateContentDocs(pkg, container).map((m) => m.id)
+    expect(out).toContain('RSC-011')
+    expect(out).not.toContain('RSC-010')
+  })
+
+  it('no RSC-010/011 for a hyperlink to a spine content document', () => {
+    // c1 and c2 are both content docs; setup() puts both in the spine.
+    const { pkg, container } = setup({ 'c1.xhtml': '<a href="c2.xhtml">x</a>', 'c2.xhtml': '<p>2</p>' })
+    const out = validateContentDocs(pkg, container).map((m) => m.id)
+    expect(out).not.toContain('RSC-010')
+    expect(out).not.toContain('RSC-011')
+  })
+
+  it('RSC-010 is suppressed when the non-content target has a content-document fallback', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<a href="photo.jpg">x</a>' })
+    // photo.jpg (non-blessed) falls back to fb (xhtml) via the manifest fallback chain.
+    pkg.manifest.push({ id: 'photo', href: 'photo.jpg', mediaType: 'image/jpeg', properties: [], fallback: 'fb', loc: LOC })
+    pkg.manifest.push({ id: 'fb', href: 'fb.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC })
+    container.resources.set('EPUB/photo.jpg', { path: 'EPUB/photo.jpg', bytes: enc('x'), compression: 'deflate' })
+    container.resources.set('EPUB/fb.xhtml', { path: 'EPUB/fb.xhtml', bytes: enc(DOC('<p>fb</p>')), compression: 'deflate' })
+    expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-010')
   })
 })
