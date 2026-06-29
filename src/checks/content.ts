@@ -146,7 +146,13 @@ function checkReferences(
     const url = ref.url
     if (url.startsWith('#')) continue // same-document fragment; handled by the fragment check
     if (isRemote(url)) {
-      if (!REMOTE_ALLOWED.has(ref.type)) messages.push(msg('RSC-006', ref.loc, url))
+      if (!REMOTE_ALLOWED.has(ref.type)) {
+        messages.push(msg('RSC-006', ref.loc, url))
+      } else if (ref.type !== 'hyperlink') {
+        // Remote-allowed non-hyperlink refs (audio/video/cite) must use HTTPS.
+        const scheme = url.slice(0, url.indexOf(':')).toLowerCase()
+        if (scheme !== 'https' && scheme !== 'file') messages.push(msg('RSC-031', ref.loc, url))
+      }
       continue
     }
     if (hasScheme(url)) continue // data:, mailto:, tel:, … — not container-relative

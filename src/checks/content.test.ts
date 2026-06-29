@@ -138,3 +138,19 @@ describe('validateContentDocs — hyperlink targets', () => {
     expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-010')
   })
 })
+
+describe('validateContentDocs — remote HTTPS', () => {
+  it('RSC-031 for a remote audio reference over HTTP', () => {
+    const out = ids({ 'c1.xhtml': '<audio src="http://example.com/a.mp3"></audio>' })
+    expect(out).toContain('RSC-031')
+    expect(out).not.toContain('RSC-006') // audio is allowed to be remote
+  })
+
+  it('no RSC-031 for a remote audio reference over HTTPS', () => {
+    expect(ids({ 'c1.xhtml': '<audio src="https://example.com/a.mp3"></audio>' })).not.toContain('RSC-031')
+  })
+
+  it('no RSC-031 for a remote hyperlink over HTTP', () => {
+    expect(ids({ 'c1.xhtml': '<a href="http://example.com/">x</a>' })).not.toContain('RSC-031')
+  })
+})

@@ -210,6 +210,13 @@ export const CORPUS: Fixture[] = [
     epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><a href="nav.xhtml">x</a></p>') } }),
     expected: [E('RSC-011', 'ERROR')],
   },
+  {
+    name: 'content-audio-remote-http',
+    area: 'content',
+    description: 'content audio@src is a remote HTTP url that should be HTTPS (epubcheck RSC-031)',
+    epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><audio src="http://example.com/a.mp3"></audio></p>') } }),
+    expected: [E('RSC-031', 'WARNING')],
+  },
 
   // ---- CSS (mirrors epub3/06-content-document css scenarios) ----
   { name: 'css-valid', area: 'css', description: 'valid EPUB with a stylesheet', epub: cssEpub('p { color: red; }'), expected: [] },
