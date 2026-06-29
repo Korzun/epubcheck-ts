@@ -1,5 +1,6 @@
 import { findDescendants, textContent } from '../io/xml.js'
-import type { EpubContainer } from '../io/zip.js'
+import { getResource, type EpubContainer } from '../io/zip.js'
+import { resolvePath, isRemote } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
 import type { NavDocument, NavSection } from '../parse/nav.js'
 import type { PackageDocument } from '../parse/opf.js'
@@ -10,10 +11,10 @@ function hasType(section: NavSection, type: string): boolean {
 
 export function validateNav(
   nav: NavDocument,
-  _pkg: PackageDocument,
-  _container: EpubContainer,
+  pkg: PackageDocument,
+  container: EpubContainer,
 ): Message[] {
-  return [...checkOccurrence(nav), ...checkContent(nav)]
+  return [...checkOccurrence(nav), ...checkContent(nav), ...checkLinks(nav, pkg, container)]
 }
 
 function checkOccurrence(nav: NavDocument): Message[] {
@@ -33,6 +34,36 @@ function checkOccurrence(nav: NavDocument): Message[] {
   const toc = tocs[0]
   if (toc && findDescendants(toc.node, 'ol').length === 0) {
     messages.push(msg('RSC-005', toc.loc, nav.path, 'The "toc" nav element must contain an ol element.'))
+  }
+
+  return messages
+}
+
+function checkLinks(nav: NavDocument, pkg: PackageDocument, container: EpubContainer): Message[] {
+  const messages: Message[] = []
+
+  // Container paths declared in the manifest (manifest hrefs resolve against the OPF path).
+  const manifestPaths = new Set<string>()
+  for (const item of pkg.manifest) {
+    if (item.href && !isRemote(item.href)) manifestPaths.add(resolvePath(pkg.path, item.href))
+  }
+
+  for (const section of nav.sections) {
+    const label = section.types[0] ?? 'toc'
+    for (const a of findDescendants(section.node, 'a')) {
+      const href = a.attrs?.['href']
+      if (!href) continue
+      if (isRemote(href)) {
+        messages.push(msg('NAV-010', a.loc, label, href))
+        continue
+      }
+      const target = resolvePath(nav.path, href) // resolvePath strips the fragment
+      if (!getResource(container, target)) {
+        messages.push(msg('RSC-007', a.loc, href))
+      } else if (!manifestPaths.has(target)) {
+        messages.push(msg('RSC-008', a.loc, href))
+      }
+    }
   }
 
   return messages
