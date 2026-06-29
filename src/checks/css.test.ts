@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type { EpubContainer, Resource } from '../io/zip.js'
 import type { PackageDocument, ManifestItem } from '../parse/opf.js'
-import { validateCssDocs } from './css.js'
+import { validateCssDocs, validateCss } from './css.js'
+import { manifestPathMap } from '../parse/opf.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 const LOC = { path: 'EPUB/package.opf' }
@@ -65,5 +66,21 @@ describe('validateCssDocs — properties', () => {
   })
   it('CSS-019 for an empty @font-face', () => {
     expect(ids('@font-face {}')).toContain('CSS-019')
+  })
+})
+
+describe('validateCss (reusable)', () => {
+  it('runs reference + property checks on a synthesized CssDocument', () => {
+    const { pkg, container } = setup('') // reuse the existing test helper; the .css resource content is irrelevant here
+    const manifest = manifestPathMap(pkg)
+    const css = {
+      path: 'EPUB/c1.xhtml',
+      refs: [{ url: 'missing.png', type: 'generic' as const, loc: { path: 'EPUB/c1.xhtml' } }],
+      declarations: [{ property: 'position', value: 'fixed', loc: { path: 'EPUB/c1.xhtml' } }],
+      fontFaces: [],
+    }
+    const ids = validateCss(css, container, manifest).map((m) => m.id)
+    expect(ids).toContain('RSC-007') // missing.png unresolved relative to EPUB/c1.xhtml
+    expect(ids).toContain('CSS-006') // position: fixed
   })
 })
