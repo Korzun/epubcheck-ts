@@ -87,7 +87,7 @@ export const CORPUS: Fixture[] = [
     area: 'opf',
     description: 'package has no spine element (epubcheck RSC-005)',
     epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('<spine><itemref idref="content"/></spine>', '') } }),
-    expected: [E('RSC-005', 'ERROR')],
+    expected: [E('RSC-005', 'ERROR'), E('RSC-011', 'ERROR')],
   },
   {
     name: 'opf-spine-no-linear',
@@ -101,7 +101,7 @@ export const CORPUS: Fixture[] = [
     area: 'opf',
     description: 'spine itemref idref is not a manifest item (epubcheck OPF-049)',
     epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('idref="content"', 'idref="nope"') } }),
-    expected: [E('OPF-049', 'ERROR')],
+    expected: [E('OPF-049', 'ERROR'), E('RSC-011', 'ERROR')],
   },
   {
     name: 'opf-duplicate-resource',
@@ -187,6 +187,20 @@ export const CORPUS: Fixture[] = [
       },
     }),
     expected: [E('NAV-011', 'WARNING')],
+  },
+  {
+    name: 'nav-link-missing-target',
+    area: 'nav',
+    description: 'nav toc link points to a missing file (epubcheck RSC-007, via content validation of the nav doc)',
+    epub: buildEpub({ files: { 'EPUB/nav.xhtml': NAV.replace('href="content_001.xhtml"', 'href="missing.xhtml"') } }),
+    expected: [E('RSC-007', 'ERROR')],
+  },
+  {
+    name: 'nav-link-bad-fragment',
+    area: 'nav',
+    description: 'nav toc link has an undefined fragment in its target (epubcheck RSC-012, via content validation of the nav doc)',
+    epub: buildEpub({ files: { 'EPUB/nav.xhtml': NAV.replace('href="content_001.xhtml"', 'href="content_001.xhtml#nope"') } }),
+    expected: [E('RSC-012', 'ERROR')],
   },
 
   // ---- Content references (mirrors epub3/06-content-document) ----

@@ -84,10 +84,6 @@ function hasFallbackToBlessed(item: ManifestItem, byId: Map<string, ManifestItem
   return hasFallbackTo(item, byId, (i) => isBlessedContentType(i.mediaType))
 }
 
-function inSpine(item: ManifestItem, spineIdrefs: ReadonlySet<string>): boolean {
-  return item.id !== undefined && spineIdrefs.has(item.id)
-}
-
 export function validateContentDocs(pkg: PackageDocument, container: EpubContainer): Message[] {
   const messages: Message[] = []
   const manifest = manifestPathMap(pkg)
@@ -96,23 +92,29 @@ export function validateContentDocs(pkg: PackageDocument, container: EpubContain
   for (const item of pkg.manifest) {
     if (item.id !== undefined) byId.set(item.id, item)
   }
-  const spineIdrefs = new Set<string>()
+  // Container paths of every in-spine manifest item. Path-based (not id-based) so a
+  // resource that is in the spine under one manifest item but duplicated under another,
+  // not-in-spine item is still correctly treated as in-spine.
+  const spinePaths = new Set<string>()
   for (const s of pkg.spine) {
-    if (s.idref !== undefined) spineIdrefs.add(s.idref)
+    if (s.idref === undefined) continue
+    const item = byId.get(s.idref)
+    if (item?.href && !isRemote(item.href)) spinePaths.add(resolvePath(pkg.path, item.href))
   }
 
-  // Parse every XHTML content doc except the nav doc (validated by validateNav).
+  // Parse every XHTML content document, including the nav doc (its links and
+  // inline styles get the same reference/CSS checks; validateNav additionally
+  // checks nav-specific structure, NAV-010 remote links, and NAV-011 order).
   const docs = new Map<string, ContentDocument>()
   for (const item of pkg.manifest) {
     if (item.mediaType !== 'application/xhtml+xml') continue
-    if (item.properties.includes('nav')) continue
     const { doc, messages: m } = parseContent(item, container)
     messages.push(...m)
     if (doc) docs.set(doc.path, doc)
   }
 
   for (const doc of docs.values()) {
-    messages.push(...checkReferences(doc, container, manifest, byId, spineIdrefs))
+    messages.push(...checkReferences(doc, container, manifest, byId, spinePaths))
     messages.push(...checkFragments(doc, docs, manifest))
     messages.push(...checkElements(doc))
     for (const style of doc.inlineStyles) {
@@ -156,7 +158,7 @@ function checkFragments(
       const item = manifest.get(target)
       if (!item || !isFragmentCheckable(item.mediaType)) continue // only id-check XHTML targets
       ids = docs.get(target)?.ids
-      if (!ids) continue // target XHTML wasn't parsed (e.g. the nav doc, which we skip)
+      if (!ids) continue // target XHTML wasn't parsed
     }
 
     if (!ids.has(frag)) messages.push(msg('RSC-012', ref.loc))
@@ -186,7 +188,7 @@ function checkReferences(
   container: EpubContainer,
   manifest: Map<string, ManifestItem>,
   byId: Map<string, ManifestItem>,
-  spineIdrefs: ReadonlySet<string>,
+  spinePaths: ReadonlySet<string>,
 ): Message[] {
   const messages: Message[] = []
   for (const ref of doc.refs) {
@@ -213,7 +215,7 @@ function checkReferences(
       if (item) {
         if (!isBlessedContentType(item.mediaType) && !hasFallbackToBlessed(item, byId)) {
           messages.push(msg('RSC-010', ref.loc))
-        } else if (!inSpine(item, spineIdrefs)) {
+        } else if (!spinePaths.has(target)) {
           messages.push(msg('RSC-011', ref.loc))
         }
       }

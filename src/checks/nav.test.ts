@@ -28,12 +28,12 @@ function navDoc(body: string, targets: string[] = ['EPUB/c1.xhtml']): { nav: Nav
   return { nav: nav!, pkg, container }
 }
 const ids = (body: string, targets?: string[]) => {
-  const { nav, pkg, container } = navDoc(body, targets)
-  return validateNav(nav, pkg, container).map((m) => m.id)
+  const { nav, pkg } = navDoc(body, targets)
+  return validateNav(nav, pkg).map((m) => m.id)
 }
 const msgs = (body: string, targets?: string[]) => {
-  const { nav, pkg, container } = navDoc(body, targets)
-  return validateNav(nav, pkg, container)
+  const { nav, pkg } = navDoc(body, targets)
+  return validateNav(nav, pkg)
 }
 
 const TOC = '<nav epub:type="toc"><ol><li><a href="c1.xhtml">One</a></li></ol></nav>'
@@ -86,18 +86,12 @@ describe('validateNav — content', () => {
 })
 
 describe('validateNav — links', () => {
-  it('RSC-007 when a nav link target is not in the container', () => {
-    expect(ids('<nav epub:type="toc"><ol><li><a href="missing.xhtml">x</a></li></ol></nav>'))
-      .toContain('RSC-007')
+  it('no longer emits RSC-007/008 for broken nav links (now owned by content validation)', () => {
+    expect(ids('<nav epub:type="toc"><ol><li><a href="missing.xhtml">x</a></li></ol></nav>')).toEqual([])
   })
   it('NAV-010 when a nav link is remote', () => {
     expect(ids('<nav epub:type="toc"><ol><li><a href="https://example.com/x">x</a></li></ol></nav>'))
       .toContain('NAV-010')
-  })
-  it('RSC-008 when the target exists in the container but is not in the manifest', () => {
-    // 'extra.xhtml' is added to the container targets but not to the manifest in navDoc().
-    expect(ids('<nav epub:type="toc"><ol><li><a href="extra.xhtml">x</a></li></ol></nav>', ['EPUB/c1.xhtml', 'EPUB/extra.xhtml']))
-      .toContain('RSC-008')
   })
   it('does not flag a resolvable, manifest-declared link', () => {
     expect(ids('<nav epub:type="toc"><ol><li><a href="c1.xhtml#frag">x</a></li></ol></nav>'))
@@ -132,7 +126,7 @@ describe('validateNav — reading order (NAV-011)', () => {
       ],
       loc: LOC,
     }
-    return validateNav(nav!, pkg, container).map((m) => m.id)
+    return validateNav(nav!, pkg).map((m) => m.id)
   }
 
   it('NAV-011 when toc links go backwards in spine order', () => {
