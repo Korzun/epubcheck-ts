@@ -3,8 +3,11 @@ import { getResource, type EpubContainer } from '../io/zip.js'
 import { resolvePath, isRemote } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
 import type { ManifestItem, PackageDocument } from '../parse/opf.js'
+import type { XmlNode } from '../io/xml.js'
+import { isKnownHtmlElement } from '../util/html-elements.js'
 
 const REMOTE_ALLOWED: ReadonlySet<RefType> = new Set<RefType>(['hyperlink', 'cite', 'audio', 'video'])
+const HTML_NS = 'http://www.w3.org/1999/xhtml'
 
 /** A URL carrying any scheme (https:, data:, mailto:, tel:, …). */
 function hasScheme(url: string): boolean {
@@ -37,6 +40,7 @@ export function validateContentDocs(pkg: PackageDocument, container: EpubContain
   for (const doc of docs.values()) {
     messages.push(...checkReferences(doc, container, manifest))
     messages.push(...checkFragments(doc, docs, manifest))
+    messages.push(...checkElements(doc))
   }
   return messages
 }
@@ -72,6 +76,23 @@ function checkFragments(
 
     if (!ids.has(frag)) messages.push(msg('RSC-012', ref.loc))
   }
+  return messages
+}
+
+function checkElements(doc: ContentDocument): Message[] {
+  const messages: Message[] = []
+  const walk = (node: XmlNode): void => {
+    for (const child of node.children ?? []) {
+      if (child.type !== 'element') continue
+      const name = child.name ?? ''
+      // Only flag elements explicitly in the XHTML namespace; skip custom elements (contain "-").
+      if (child.ns === HTML_NS && !name.includes('-') && !isKnownHtmlElement(name)) {
+        messages.push(msg('RSC-005', child.loc, doc.path, `Unknown element "${name}" in the XHTML namespace.`))
+      }
+      walk(child)
+    }
+  }
+  walk(doc.root)
   return messages
 }
 

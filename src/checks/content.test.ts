@@ -71,3 +71,16 @@ describe('validateContentDocs — fragments', () => {
     expect(ids({ 'c1.xhtml': '<a href="c2.xhtml#ok">x</a>', 'c2.xhtml': '<p id="ok">2</p>' })).toEqual([])
   })
 })
+
+describe('validateContentDocs — elements', () => {
+  it('RSC-005 for an unknown XHTML-namespace element', () => {
+    const msgs = (() => { const { pkg, container } = setup({ 'c1.xhtml': '<frobnicate>x</frobnicate>' }); return validateContentDocs(pkg, container) })()
+    expect(msgs.some((m) => m.id === 'RSC-005' && m.message.includes('frobnicate'))).toBe(true)
+  })
+  it('does not flag known elements or custom (hyphenated) elements', () => {
+    expect(ids({ 'c1.xhtml': '<section><my-widget>x</my-widget></section>' })).toEqual([])
+  })
+  it('does not flag SVG-namespace elements', () => {
+    expect(ids({ 'c1.xhtml': '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>' })).toEqual([])
+  })
+})
