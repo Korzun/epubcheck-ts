@@ -15,8 +15,10 @@ export const CATALOG: Record<string, { severity: Severity; template: string }> =
   'RSC-002': { severity: 'FATAL', template: 'The required META-INF/container.xml resource could not be found.' },
   'RSC-003': { severity: 'ERROR', template: "No rootfile with media type 'application/oebps-package+xml' was found in META-INF/container.xml." },
   'RSC-005': { severity: 'ERROR', template: "Error while parsing file '%1$s': %2$s" },
+  'RSC-006': { severity: 'ERROR', template: 'Remote resource reference is not allowed in this context; resource "%1$s" must be located in the EPUB container.' },
   'RSC-007': { severity: 'ERROR', template: 'Referenced resource "%1$s" could not be found in the EPUB.' },
   'RSC-008': { severity: 'ERROR', template: 'Referenced resource "%1$s" is not declared in the OPF manifest.' },
+  'RSC-012': { severity: 'ERROR', template: 'Fragment identifier is not defined.' },
   // Package / OPF semantics
   'OPF-001': { severity: 'ERROR', template: 'There was an error when parsing the EPUB version: %1$s' },
   'OPF-030': { severity: 'ERROR', template: 'The unique-identifier "%1$s" was not found.' },

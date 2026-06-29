@@ -38,4 +38,10 @@ describe('CATALOG', () => {
     expect(CATALOG['NAV-010']?.template).toContain('%1$s')
     expect(CATALOG['NAV-010']?.template).toContain('%2$s')
   })
+
+  it('defines content-reference message ids', () => {
+    expect(CATALOG['RSC-006']?.severity).toBe('ERROR')
+    expect(CATALOG['RSC-012']?.severity).toBe('ERROR')
+    expect(CATALOG['RSC-006']?.template).toContain('%1$s')
+  })
 })
