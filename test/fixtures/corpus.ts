@@ -1,5 +1,5 @@
 import type { Severity } from '../../src/index.js'
-import { buildEpub, CONTAINER, OPF } from './build.js'
+import { buildEpub, CONTAINER, OPF, NAV, CONTENT } from './build.js'
 
 export interface Expected {
   id: string
@@ -137,5 +137,46 @@ export const CORPUS: Fixture[] = [
     description: 'supplementary: unique-identifier does not match any dc:identifier id (OPF-030)',
     epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('<dc:identifier id="uid">', '<dc:identifier id="other">') } }),
     expected: [E('OPF-030', 'ERROR')],
+  },
+
+  // ---- Navigation (mirrors epub3/07-navigation-document) ----
+  {
+    name: 'nav-toc-missing',
+    area: 'nav',
+    description: 'nav document has no toc nav (epubcheck RSC-005)',
+    epub: buildEpub({
+      files: {
+        // Remove the <nav> entirely so the only deviation is "no toc nav"
+        // (renaming to landmarks would add a second RSC-005 for the anchor's missing epub:type).
+        'EPUB/nav.xhtml': NAV.replace(
+          '<nav epub:type="toc"><ol><li><a href="content_001.xhtml">Content</a></li></ol></nav>',
+          '<p>no nav</p>',
+        ),
+      },
+    }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'nav-link-remote',
+    area: 'nav',
+    description: 'toc nav link points to a remote URL (epubcheck NAV-010)',
+    epub: buildEpub({ files: { 'EPUB/nav.xhtml': NAV.replace('href="content_001.xhtml"', 'href="https://example.com/x"') } }),
+    expected: [E('NAV-010', 'ERROR')],
+  },
+
+  // ---- Content references (mirrors epub3/06-content-document) ----
+  {
+    name: 'content-link-missing-doc',
+    area: 'content',
+    description: 'content a@href points to a missing document (epubcheck RSC-007)',
+    epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><a href="missing.xhtml">x</a></p>') } }),
+    expected: [E('RSC-007', 'ERROR')],
+  },
+  {
+    name: 'content-link-missing-fragment',
+    area: 'content',
+    description: 'content a@href has a same-doc fragment that is not defined (epubcheck RSC-012)',
+    epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><a href="#nope">x</a></p>') } }),
+    expected: [E('RSC-012', 'ERROR')],
   },
 ]
