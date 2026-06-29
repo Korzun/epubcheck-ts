@@ -297,7 +297,7 @@ The project license is **BSD-3-Clause** (mirrors upstream). Upstream copyright n
 
 - **ESM-only**, TypeScript source, ship `.d.ts`. Target ES2022 / Node 18+ / evergreen browsers.
 - Build with **tsdown** (rolldown-based, actively maintained; emits ESM + types). Configured with `fixedExtension: false` so output is `index.js` / `index.d.ts`.
-- **Runtime deps:** `fflate` (ZIP), `saxes` (streaming XML/XHTML with line/column).
+- **Runtime deps:** `fflate` (ZIP), `saxes` (XML/XHTML), `css-tree` (CSS).
 - **Dev deps:** `vitest`, `tsdown`, `typescript`.
 - Single package: `epubcheck-ts`.
 

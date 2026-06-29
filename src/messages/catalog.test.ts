@@ -44,4 +44,15 @@ describe('CATALOG', () => {
     expect(CATALOG['RSC-012']?.severity).toBe('ERROR')
     expect(CATALOG['RSC-006']?.template).toContain('%1$s')
   })
+
+  it('defines CSS message ids', () => {
+    expect(CATALOG['CSS-001']?.severity).toBe('ERROR')
+    expect(CATALOG['CSS-002']?.severity).toBe('ERROR')
+    expect(CATALOG['CSS-006']?.severity).toBe('USAGE')
+    expect(CATALOG['CSS-008']?.severity).toBe('ERROR')
+    expect(CATALOG['CSS-019']?.severity).toBe('WARNING')
+    expect(CATALOG['RSC-013']?.severity).toBe('ERROR')
+    expect(CATALOG['RSC-030']?.severity).toBe('ERROR')
+    expect(CATALOG['RSC-031']?.severity).toBe('WARNING')
+  })
 })
