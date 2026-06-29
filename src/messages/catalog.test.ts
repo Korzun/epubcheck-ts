@@ -27,4 +27,15 @@ describe('CATALOG', () => {
     expect(CATALOG['OPF-049']?.template).toContain('%1$s')
     expect(CATALOG['RSC-001']?.template).toContain('%1$s')
   })
+
+  it('defines navigation message ids with severities', () => {
+    expect(CATALOG['RSC-007']?.severity).toBe('ERROR')
+    expect(CATALOG['RSC-008']?.severity).toBe('ERROR')
+    expect(CATALOG['NAV-010']?.severity).toBe('ERROR')
+  })
+
+  it('NAV-010 template carries two placeholders', () => {
+    expect(CATALOG['NAV-010']?.template).toContain('%1$s')
+    expect(CATALOG['NAV-010']?.template).toContain('%2$s')
+  })
 })
