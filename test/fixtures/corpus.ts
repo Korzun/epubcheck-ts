@@ -1,5 +1,5 @@
 import type { Severity } from '../../src/index.js'
-import { buildEpub, CONTAINER, OPF, NAV, CONTENT } from './build.js'
+import { buildEpub, cssEpub, CONTAINER, OPF, NAV, CONTENT } from './build.js'
 
 export interface Expected {
   id: string
@@ -178,5 +178,92 @@ export const CORPUS: Fixture[] = [
     description: 'content a@href has a same-doc fragment that is not defined (epubcheck RSC-012)',
     epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><a href="#nope">x</a></p>') } }),
     expected: [E('RSC-012', 'ERROR')],
+  },
+
+  // ---- CSS (mirrors epub3/06-content-document css scenarios) ----
+  { name: 'css-valid', area: 'css', description: 'valid EPUB with a stylesheet', epub: cssEpub('p { color: red; }'), expected: [] },
+  {
+    name: 'css-property-direction',
+    area: 'css',
+    description: 'stylesheet uses the direction property (epubcheck CSS-001)',
+    epub: cssEpub('body { direction: rtl; }'),
+    expected: [E('CSS-001', 'ERROR')],
+  },
+  {
+    name: 'css-font-face-empty',
+    area: 'css',
+    description: 'empty @font-face block (epubcheck CSS-019)',
+    epub: cssEpub('@font-face {}'),
+    expected: [E('CSS-019', 'WARNING')],
+  },
+  {
+    name: 'css-url-empty',
+    area: 'css',
+    description: 'empty url() reference (epubcheck CSS-002)',
+    epub: cssEpub('body { background: url(); }'),
+    expected: [E('CSS-002', 'ERROR')],
+  },
+  {
+    name: 'css-url-missing',
+    area: 'css',
+    description: 'url() target is absent from the container (epubcheck RSC-007)',
+    epub: cssEpub('body { background: url(missing.png); }'),
+    expected: [E('RSC-007', 'ERROR')],
+  },
+  {
+    name: 'css-import-not-declared',
+    area: 'css',
+    description: '@import target is present but not in the manifest (epubcheck RSC-008)',
+    epub: cssEpub('@import "extra.css";', { 'EPUB/extra.css': 'p{}' }),
+    expected: [E('RSC-008', 'ERROR')],
+  },
+  {
+    name: 'css-remote-image',
+    area: 'css',
+    description: 'supplementary: remote background image not allowed (RSC-006)',
+    epub: cssEpub('body { background: url(https://example.com/a.png); }'),
+    expected: [E('RSC-006', 'ERROR')],
+  },
+  {
+    name: 'css-import-fragment',
+    area: 'css',
+    description: 'supplementary: @import url has a fragment (RSC-013) + target undeclared (RSC-008)',
+    epub: cssEpub('@import "other.css#x";', { 'EPUB/other.css': 'p{}' }),
+    expected: [E('RSC-013', 'ERROR'), E('RSC-008', 'ERROR')],
+  },
+  {
+    name: 'css-file-url',
+    area: 'css',
+    description: 'supplementary: file: URL is not allowed (RSC-030)',
+    epub: cssEpub('body { background: url(file:///etc/passwd); }'),
+    expected: [E('RSC-030', 'ERROR')],
+  },
+  {
+    name: 'css-font-remote-http',
+    area: 'css',
+    description: 'supplementary: remote @font-face over HTTP should be HTTPS (RSC-031)',
+    epub: cssEpub('@font-face { font-family: F; src: url(http://example.com/f.woff2); }'),
+    expected: [E('RSC-031', 'WARNING')],
+  },
+  {
+    name: 'css-position-fixed',
+    area: 'css',
+    description: 'supplementary: position:fixed (CSS-006, usage)',
+    epub: cssEpub('div { position: fixed; }'),
+    expected: [E('CSS-006', 'USAGE')],
+  },
+  {
+    name: 'inline-style-element-url-missing',
+    area: 'css',
+    description: 'supplementary: <style> element url() target missing (RSC-007)',
+    epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<head><title>t</title></head>', '<head><title>t</title><style>body { background: url(missing.png); }</style></head>') } }),
+    expected: [E('RSC-007', 'ERROR')],
+  },
+  {
+    name: 'inline-style-attr-position-fixed',
+    area: 'css',
+    description: 'supplementary: style="" attribute position:fixed (CSS-006, usage)',
+    epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p style="position: fixed">x</p>') } }),
+    expected: [E('CSS-006', 'USAGE')],
   },
 ]
