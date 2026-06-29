@@ -50,6 +50,13 @@ describe('CATALOG', () => {
     expect(CATALOG['NAV-010']?.template).toContain('%2$s')
   })
 
+  it('defines the navigation reading-order message id', () => {
+    expect(CATALOG['NAV-011']).toEqual({
+      severity: 'WARNING',
+      template: '"%1$s" nav must be in reading order; link target "%2$s" is before the previous link\'s target in %3$s order.',
+    })
+  })
+
   it('defines content-reference message ids', () => {
     expect(CATALOG['RSC-006']?.severity).toBe('ERROR')
     expect(CATALOG['RSC-012']?.severity).toBe('ERROR')

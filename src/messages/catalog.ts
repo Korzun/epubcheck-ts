@@ -33,6 +33,7 @@ export const CATALOG: Record<string, { severity: Severity; template: string }> =
   'RSC-001': { severity: 'ERROR', template: 'File "%1$s" could not be found.' },
   // Navigation
   'NAV-010': { severity: 'ERROR', template: '"%1$s" nav must not link to remote resources; found link to "%2$s".' },
+  'NAV-011': { severity: 'WARNING', template: '"%1$s" nav must be in reading order; link target "%2$s" is before the previous link\'s target in %3$s order.' },
   // Internal
   'CHK-001': { severity: 'FATAL', template: 'An internal error occurred while validating: %1$s' },
   // CSS

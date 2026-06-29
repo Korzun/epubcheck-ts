@@ -1,20 +1,15 @@
 import { findDescendants, textContent } from '../io/xml.js'
-import { getResource, type EpubContainer } from '../io/zip.js'
 import { resolvePath, isRemote } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
 import type { NavDocument, NavSection } from '../parse/nav.js'
-import type { PackageDocument } from '../parse/opf.js'
+import type { ManifestItem, PackageDocument } from '../parse/opf.js'
 
 function hasType(section: NavSection, type: string): boolean {
   return section.types.includes(type)
 }
 
-export function validateNav(
-  nav: NavDocument,
-  pkg: PackageDocument,
-  container: EpubContainer,
-): Message[] {
-  return [...checkOccurrence(nav), ...checkContent(nav), ...checkLinks(nav, pkg, container)]
+export function validateNav(nav: NavDocument, pkg: PackageDocument): Message[] {
+  return [...checkOccurrence(nav), ...checkContent(nav), ...checkLinks(nav), ...checkReadingOrder(nav, pkg)]
 }
 
 function checkOccurrence(nav: NavDocument): Message[] {
@@ -39,30 +34,46 @@ function checkOccurrence(nav: NavDocument): Message[] {
   return messages
 }
 
-function checkLinks(nav: NavDocument, pkg: PackageDocument, container: EpubContainer): Message[] {
+function checkLinks(nav: NavDocument): Message[] {
   const messages: Message[] = []
-
-  // Container paths declared in the manifest (manifest hrefs resolve against the OPF path).
-  const manifestPaths = new Set<string>()
-  for (const item of pkg.manifest) {
-    if (item.href && !isRemote(item.href)) manifestPaths.add(resolvePath(pkg.path, item.href))
-  }
-
   for (const section of nav.sections) {
     const label = section.types[0] ?? 'toc'
     for (const a of findDescendants(section.node, 'a')) {
       const href = a.attrs?.['href']
-      if (!href) continue
-      if (isRemote(href)) {
-        messages.push(msg('NAV-010', a.loc, label, href))
-        continue
-      }
-      const target = resolvePath(nav.path, href) // resolvePath strips the fragment
-      if (!getResource(container, target)) {
-        messages.push(msg('RSC-007', a.loc, href))
-      } else if (!manifestPaths.has(target)) {
-        messages.push(msg('RSC-008', a.loc, href))
-      }
+      // RSC-007/008 (missing/undeclared) and RSC-012 (fragment) for nav links are
+      // emitted by validateContentDocs, which now processes the nav document.
+      if (href && isRemote(href)) messages.push(msg('NAV-010', a.loc, label, href))
+    }
+  }
+  return messages
+}
+
+function checkReadingOrder(nav: NavDocument, pkg: PackageDocument): Message[] {
+  const messages: Message[] = []
+
+  // Container path of each spine item → its spine position (index).
+  const itemById = new Map<string, ManifestItem>()
+  for (const item of pkg.manifest) {
+    if (item.id !== undefined) itemById.set(item.id, item)
+  }
+  const spinePos = new Map<string, number>()
+  pkg.spine.forEach((s, i) => {
+    if (s.idref === undefined) return
+    const item = itemById.get(s.idref)
+    if (item?.href && !isRemote(item.href)) spinePos.set(resolvePath(pkg.path, item.href), i)
+  })
+
+  for (const section of nav.sections) {
+    if (!hasType(section, 'toc')) continue // NAV-011 applies to the toc nav only
+    let lastPos = -1
+    for (const a of findDescendants(section.node, 'a')) {
+      const href = a.attrs?.['href']
+      if (!href || isRemote(href)) continue
+      const target = resolvePath(nav.path, href) // strips the fragment
+      const pos = spinePos.get(target)
+      if (pos === undefined) continue // target not in the spine → skipped (epubcheck behavior)
+      if (pos < lastPos) messages.push(msg('NAV-011', a.loc, 'toc', target, 'spine'))
+      lastPos = pos
     }
   }
 
