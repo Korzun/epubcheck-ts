@@ -7,6 +7,7 @@ export type Severity = 'FATAL' | 'ERROR' | 'WARNING' | 'INFO' | 'USAGE'
  */
 export const CATALOG: Record<string, { severity: Severity; template: string }> = {
   // Package / container structure
+  'PKG-001': { severity: 'WARNING', template: 'Validating the EPUB against version %1$s but detected version %2$s.' },
   'PKG-003': { severity: 'FATAL', template: 'The EPUB could not be read: %1$s' },
   'PKG-005': { severity: 'ERROR', template: 'The mimetype file must not be compressed.' },
   'PKG-006': { severity: 'ERROR', template: 'The mimetype file entry is missing or is not the first file in the archive.' },
@@ -21,6 +22,7 @@ export const CATALOG: Record<string, { severity: Severity; template: string }> =
   'RSC-012': { severity: 'ERROR', template: 'Fragment identifier is not defined.' },
   // Package / OPF semantics
   'OPF-001': { severity: 'ERROR', template: 'There was an error when parsing the EPUB version: %1$s' },
+  'OPF-003': { severity: 'USAGE', template: 'Item "%1$s" exists in the EPUB, but is not declared in the OPF manifest.' },
   'OPF-030': { severity: 'ERROR', template: 'The unique-identifier "%1$s" was not found.' },
   'OPF-033': { severity: 'ERROR', template: 'The spine contains no linear resources.' },
   'OPF-048': { severity: 'ERROR', template: 'Package tag is missing its required unique-identifier attribute and value.' },
