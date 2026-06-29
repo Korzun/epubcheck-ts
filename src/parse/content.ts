@@ -18,6 +18,12 @@ export interface ContentRef {
   url: string
   type: RefType
   loc: Location
+  /**
+   * True when the referencing context itself supplies a fallback (e.g. an
+   * <img> inside <picture>, a <source> inside <audio>, an <object> with
+   * fallback content). Used to suppress RSC-032.
+   */
+  hasIntrinsicFallback: boolean
 }
 export interface InlineStyle {
   context: 'stylesheet' | 'declarationList'
@@ -47,12 +53,13 @@ function addRefs(
   attrs: Record<string, string>,
   refs: ContentRef[],
 ): void {
-  const push = (url: string | undefined, type: RefType): void => {
-    if (url) refs.push({ url, type, loc: el.loc })
+  const push = (url: string | undefined, type: RefType, intrinsic = false): void => {
+    if (url) refs.push({ url, type, loc: el.loc, hasIntrinsicFallback: intrinsic })
   }
-  const pushAll = (urls: string[], type: RefType): void => {
-    for (const url of urls) refs.push({ url, type, loc: el.loc })
+  const pushAll = (urls: string[], type: RefType, intrinsic = false): void => {
+    for (const url of urls) refs.push({ url, type, loc: el.loc, hasIntrinsicFallback: intrinsic })
   }
+  const inPicture = parent === 'picture'
 
   switch (el.name) {
     case 'a':
@@ -60,17 +67,17 @@ function addRefs(
       push(attrs['href'] ?? attrs['xlink:href'], 'hyperlink')
       break
     case 'img':
-      push(attrs['src'], 'image')
-      if (attrs['srcset']) pushAll(parseSrcset(attrs['srcset']), 'image')
+      push(attrs['src'], 'image', inPicture)
+      if (attrs['srcset']) pushAll(parseSrcset(attrs['srcset']), 'image', inPicture)
       break
     case 'image': // SVG <image>
       push(attrs['xlink:href'] ?? attrs['href'], 'image')
       break
     case 'source':
-      if (attrs['srcset']) pushAll(parseSrcset(attrs['srcset']), 'image')
-      else if (parent === 'audio') push(attrs['src'], 'audio')
-      else if (parent === 'video') push(attrs['src'], 'video')
-      else push(attrs['src'], 'image')
+      if (attrs['srcset']) pushAll(parseSrcset(attrs['srcset']), 'image', inPicture)
+      else if (parent === 'audio') push(attrs['src'], 'audio', true)
+      else if (parent === 'video') push(attrs['src'], 'video', false)
+      else push(attrs['src'], 'image', true) // <source> in <picture>
       break
     case 'audio':
       push(attrs['src'], 'audio')
@@ -89,7 +96,7 @@ function addRefs(
       push(attrs['src'], 'generic')
       break
     case 'object':
-      push(attrs['data'], 'generic')
+      push(attrs['data'], 'generic', true)
       break
     case 'iframe':
     case 'embed':

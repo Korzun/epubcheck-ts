@@ -24,19 +24,64 @@ function isBlessedContentType(mediaType: string | undefined): boolean {
   return mediaType !== undefined && BLESSED_CONTENT_TYPES.has(mediaType)
 }
 
+const CORE_MEDIA_TYPES: ReadonlySet<string> = new Set<string>([
+  // images
+  'image/gif',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/svg+xml',
+  // audio
+  'audio/mpeg',
+  'audio/mp4',
+  // fonts
+  'font/ttf',
+  'font/otf',
+  'font/woff',
+  'font/woff2',
+  'application/font-sfnt',
+  'application/vnd.ms-opentype',
+  'application/font-woff',
+  'application/x-font-ttf',
+  // blessed content / script / style / other core types
+  'application/xhtml+xml',
+  'text/javascript',
+  'application/javascript',
+  'application/ecmascript',
+  'text/css',
+  'application/pls+xml',
+  'application/smil+xml',
+])
+
+function isCoreMediaType(mediaType: string | undefined): boolean {
+  if (mediaType === undefined) return false
+  if (CORE_MEDIA_TYPES.has(mediaType)) return true
+  if (mediaType.startsWith('video/')) return true // all video/* are EPUB 3 core media types
+  if (/^audio\/ogg\s*;\s*codecs=opus$/i.test(mediaType)) return true // Opus in Ogg
+  return false
+}
+
 // Walk the manifest `fallback` chain (each fallback is a manifest item id) and
-// report whether any item in the chain is a blessed content-document type.
-function hasFallbackToBlessed(item: ManifestItem, byId: Map<string, ManifestItem>): boolean {
+// report whether any item in the chain satisfies the predicate. Cycle-guarded.
+function hasFallbackTo(
+  item: ManifestItem,
+  byId: Map<string, ManifestItem>,
+  predicate: (i: ManifestItem) => boolean,
+): boolean {
   const seen = new Set<string>()
   let current = item.fallback
   while (current !== undefined && !seen.has(current)) {
     seen.add(current)
     const next = byId.get(current)
     if (next === undefined) return false
-    if (isBlessedContentType(next.mediaType)) return true
+    if (predicate(next)) return true
     current = next.fallback
   }
   return false
+}
+
+function hasFallbackToBlessed(item: ManifestItem, byId: Map<string, ManifestItem>): boolean {
+  return hasFallbackTo(item, byId, (i) => isBlessedContentType(i.mediaType))
 }
 
 function inSpine(item: ManifestItem, spineIdrefs: ReadonlySet<string>): boolean {
@@ -171,6 +216,16 @@ function checkReferences(
         } else if (!inSpine(item, spineIdrefs)) {
           messages.push(msg('RSC-011', ref.loc))
         }
+      }
+    } else if (ref.type === 'image' || ref.type === 'audio' || ref.type === 'video' || ref.type === 'generic') {
+      const item = manifest.get(target)
+      if (
+        item &&
+        !ref.hasIntrinsicFallback &&
+        !isCoreMediaType(item.mediaType) &&
+        !hasFallbackTo(item, byId, (i) => isCoreMediaType(i.mediaType))
+      ) {
+        messages.push(msg('RSC-032', ref.loc, target, item.mediaType ?? ''))
       }
     }
   }

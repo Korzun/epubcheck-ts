@@ -62,3 +62,34 @@ describe('parseContent — inline styles', () => {
     expect(attrs).toEqual(['position: fixed'])
   })
 })
+
+describe('parseContent — intrinsic fallback', () => {
+  const refFor = (body: string, url: string) => {
+    const { doc } = parseContent(item, container(DOC(body)))
+    return doc!.refs.find((r) => r.url === url)
+  }
+
+  it('marks <img> and <source> inside <picture> as having intrinsic fallback', () => {
+    const body = '<picture><source srcset="a.webp"/><img src="a.png"/></picture>'
+    expect(refFor(body, 'a.png')?.hasIntrinsicFallback).toBe(true)
+    expect(refFor(body, 'a.webp')?.hasIntrinsicFallback).toBe(true)
+  })
+
+  it('marks a bare <img> as having no intrinsic fallback', () => {
+    expect(refFor('<p><img src="b.png"/></p>', 'b.png')?.hasIntrinsicFallback).toBe(false)
+  })
+
+  it('marks <source> inside <audio> as having intrinsic fallback', () => {
+    expect(refFor('<audio><source src="a.ogg"/></audio>', 'a.ogg')?.hasIntrinsicFallback).toBe(true)
+  })
+
+  it('marks <source> inside <video> and a bare <video src> as having no intrinsic fallback', () => {
+    expect(refFor('<video src="v.mp4"><source src="v2.webm"/></video>', 'v2.webm')?.hasIntrinsicFallback).toBe(false)
+    expect(refFor('<video src="v.mp4"></video>', 'v.mp4')?.hasIntrinsicFallback).toBe(false)
+  })
+
+  it('marks <object> as having intrinsic fallback and <iframe> as not', () => {
+    expect(refFor('<object data="x.pdf"></object>', 'x.pdf')?.hasIntrinsicFallback).toBe(true)
+    expect(refFor('<iframe src="y.xhtml"></iframe>', 'y.xhtml')?.hasIntrinsicFallback).toBe(false)
+  })
+})
