@@ -1,5 +1,5 @@
 import type { Severity } from '../../src/index.js'
-import { buildEpub, CONTAINER } from './build.js'
+import { buildEpub, CONTAINER, OPF } from './build.js'
 
 export interface Expected {
   id: string
@@ -58,5 +58,84 @@ export const CORPUS: Fixture[] = [
       },
     }),
     expected: [E('RSC-003', 'ERROR')],
+  },
+
+  // ---- OPF (mirrors epub3/05-package-document) ----
+  {
+    name: 'opf-title-missing',
+    area: 'opf',
+    description: 'package metadata has no dc:title (epubcheck RSC-005)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('<dc:title>Title</dc:title>', '') } }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'opf-modified-missing',
+    area: 'opf',
+    description: 'no dcterms:modified meta (epubcheck RSC-005)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('<meta property="dcterms:modified">2020-01-01T00:00:00Z</meta>', '') } }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'opf-nav-missing',
+    area: 'opf',
+    description: 'no manifest item declares the nav property (epubcheck RSC-005)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace(' properties="nav"', '') } }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'opf-spine-missing',
+    area: 'opf',
+    description: 'package has no spine element (epubcheck RSC-005)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('<spine><itemref idref="content"/></spine>', '') } }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'opf-spine-no-linear',
+    area: 'opf',
+    description: 'spine has no linear itemref (epubcheck OPF-033)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('<itemref idref="content"/>', '<itemref idref="content" linear="no"/>') } }),
+    expected: [E('OPF-033', 'ERROR')],
+  },
+  {
+    name: 'opf-spine-item-unknown',
+    area: 'opf',
+    description: 'spine itemref idref is not a manifest item (epubcheck OPF-049)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('idref="content"', 'idref="nope"') } }),
+    expected: [E('OPF-049', 'ERROR')],
+  },
+  {
+    name: 'opf-duplicate-resource',
+    area: 'opf',
+    description: 'two manifest items resolve to the same href (epubcheck OPF-074)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('</manifest>', '<item id="dup" href="content_001.xhtml" media-type="application/xhtml+xml"/></manifest>') } }),
+    expected: [E('OPF-074', 'ERROR')],
+  },
+  {
+    name: 'opf-unique-identifier-attr-missing',
+    area: 'opf',
+    description: 'package has no unique-identifier attribute (epubcheck OPF-048)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace(' unique-identifier="uid"', '') } }),
+    expected: [E('OPF-048', 'ERROR')],
+  },
+  {
+    name: 'opf-manifest-item-missing-file',
+    area: 'opf',
+    description: 'manifest declares a file absent from the container (epubcheck RSC-001)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('</manifest>', '<item id="missing" href="missing.xhtml" media-type="application/xhtml+xml"/></manifest>') } }),
+    expected: [E('RSC-001', 'ERROR')],
+  },
+  {
+    name: 'opf-version-unsupported',
+    area: 'opf',
+    description: 'supplementary: package version is not 2.0/3.0 (OPF-001)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('version="3.0"', 'version="4.0"') } }),
+    expected: [E('OPF-001', 'ERROR')],
+  },
+  {
+    name: 'opf-unique-identifier-unresolved',
+    area: 'opf',
+    description: 'supplementary: unique-identifier does not match any dc:identifier id (OPF-030)',
+    epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('<dc:identifier id="uid">', '<dc:identifier id="other">') } }),
+    expected: [E('OPF-030', 'ERROR')],
   },
 ]
