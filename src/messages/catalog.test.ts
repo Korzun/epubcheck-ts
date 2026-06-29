@@ -73,4 +73,11 @@ describe('CATALOG', () => {
     expect(CATALOG['OPF-003']?.template).toContain('%1$s')
     expect(CATALOG['PKG-001']?.template).toContain('%2$s')
   })
+
+  it('defines the foreign-resource-fallback message id', () => {
+    expect(CATALOG['RSC-032']).toEqual({
+      severity: 'ERROR',
+      template: 'Fallback must be provided for foreign resources, but found none for resource "%1$s" of type "%2$s".',
+    })
+  })
 })

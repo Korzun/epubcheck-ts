@@ -44,4 +44,5 @@ export const CATALOG: Record<string, { severity: Severity; template: string }> =
   'RSC-013': { severity: 'ERROR', template: 'Fragment identifier is used in a reference to a stylesheet resource.' },
   'RSC-030': { severity: 'ERROR', template: 'File URLs are not allowed in EPUB, but found "%1$s".' },
   'RSC-031': { severity: 'WARNING', template: 'Remote resource references should use HTTPS, but found "%1$s".' },
+  'RSC-032': { severity: 'ERROR', template: 'Fallback must be provided for foreign resources, but found none for resource "%1$s" of type "%2$s".' },
 }
