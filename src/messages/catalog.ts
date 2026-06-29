@@ -19,6 +19,8 @@ export const CATALOG: Record<string, { severity: Severity; template: string }> =
   'RSC-006': { severity: 'ERROR', template: 'Remote resource reference is not allowed in this context; resource "%1$s" must be located in the EPUB container.' },
   'RSC-007': { severity: 'ERROR', template: 'Referenced resource "%1$s" could not be found in the EPUB.' },
   'RSC-008': { severity: 'ERROR', template: 'Referenced resource "%1$s" is not declared in the OPF manifest.' },
+  'RSC-010': { severity: 'ERROR', template: 'Reference to non-standard resource type found.' },
+  'RSC-011': { severity: 'ERROR', template: 'Found a reference to a resource that is not a spine item.' },
   'RSC-012': { severity: 'ERROR', template: 'Fragment identifier is not defined.' },
   // Package / OPF semantics
   'OPF-001': { severity: 'ERROR', template: 'There was an error when parsing the EPUB version: %1$s' },
