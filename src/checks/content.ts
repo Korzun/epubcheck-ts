@@ -5,6 +5,8 @@ import { msg, type Message } from '../messages/format.js'
 import { manifestPathMap, type ManifestItem, type PackageDocument } from '../parse/opf.js'
 import type { XmlNode } from '../io/xml.js'
 import { isKnownHtmlElement } from '../util/html-elements.js'
+import { analyzeCss } from '../parse/css.js'
+import { validateCss } from './css.js'
 
 const REMOTE_ALLOWED: ReadonlySet<RefType> = new Set<RefType>(['hyperlink', 'cite', 'audio', 'video'])
 const HTML_NS = 'http://www.w3.org/1999/xhtml'
@@ -27,6 +29,17 @@ export function validateContentDocs(pkg: PackageDocument, container: EpubContain
     messages.push(...checkReferences(doc, container, manifest))
     messages.push(...checkFragments(doc, docs, manifest))
     messages.push(...checkElements(doc))
+    for (const style of doc.inlineStyles) {
+      const a = analyzeCss(style.text, doc.path, style.context)
+      messages.push(...a.messages)
+      messages.push(
+        ...validateCss(
+          { path: doc.path, refs: a.refs, declarations: a.declarations, fontFaces: a.fontFaces },
+          container,
+          manifest,
+        ),
+      )
+    }
   }
   return messages
 }

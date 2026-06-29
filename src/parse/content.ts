@@ -1,4 +1,4 @@
-import { parseXml, type XmlNode } from '../io/xml.js'
+import { parseXml, textContent, type XmlNode } from '../io/xml.js'
 import { getResource, type EpubContainer } from '../io/zip.js'
 import { resolvePath } from '../util/path.js'
 import type { Location, Message } from '../messages/format.js'
@@ -19,11 +19,18 @@ export interface ContentRef {
   type: RefType
   loc: Location
 }
+export interface InlineStyle {
+  context: 'stylesheet' | 'declarationList'
+  text: string
+  loc: Location
+}
+
 export interface ContentDocument {
   path: string
   root: XmlNode
   refs: ContentRef[]
   ids: Set<string>
+  inlineStyles: InlineStyle[]
 }
 
 /** Extract the URL of each srcset candidate ("url descriptor, url descriptor"). */
@@ -103,14 +110,27 @@ function addRefs(
   }
 }
 
-function collect(node: XmlNode, parent: string | undefined, refs: ContentRef[], ids: Set<string>): void {
+function collect(
+  node: XmlNode,
+  parent: string | undefined,
+  refs: ContentRef[],
+  ids: Set<string>,
+  inlineStyles: InlineStyle[],
+): void {
   for (const child of node.children ?? []) {
     if (child.type !== 'element') continue
     const attrs = child.attrs ?? {}
     const id = attrs['id']
     if (id) ids.add(id)
     addRefs(child, parent, attrs, refs)
-    collect(child, child.name, refs, ids)
+    if (child.name === 'style') {
+      inlineStyles.push({ context: 'stylesheet', text: textContent(child), loc: child.loc })
+    }
+    const styleAttr = attrs['style']
+    if (styleAttr) {
+      inlineStyles.push({ context: 'declarationList', text: styleAttr, loc: child.loc })
+    }
+    collect(child, child.name, refs, ids, inlineStyles)
   }
 }
 
@@ -133,6 +153,7 @@ export function parseContent(
 
   const refs: ContentRef[] = []
   const ids = new Set<string>()
-  collect(root, undefined, refs, ids)
-  return { doc: { path, root, refs, ids }, messages }
+  const inlineStyles: InlineStyle[] = []
+  collect(root, undefined, refs, ids, inlineStyles)
+  return { doc: { path, root, refs, ids, inlineStyles }, messages }
 }

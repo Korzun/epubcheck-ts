@@ -4,18 +4,22 @@ import { getResource, type EpubContainer } from '../io/zip.js'
 import { resolvePath, isRemote, hasScheme } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
 
+export function validateCss(
+  css: CssDocument,
+  container: EpubContainer,
+  manifest: Map<string, ManifestItem>,
+): Message[] {
+  return [...checkReferences(css, container, manifest), ...checkProperties(css)]
+}
+
 export function validateCssDocs(pkg: PackageDocument, container: EpubContainer): Message[] {
   const messages: Message[] = []
   const manifest = manifestPathMap(pkg)
-
   for (const item of pkg.manifest) {
     if (item.mediaType !== 'text/css') continue
     const { css, messages: m } = parseCss(item, container)
     messages.push(...m)
-    if (css) {
-      messages.push(...checkReferences(css, container, manifest))
-      messages.push(...checkProperties(css))
-    }
+    if (css) messages.push(...validateCss(css, container, manifest))
   }
   return messages
 }

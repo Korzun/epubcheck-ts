@@ -50,3 +50,15 @@ describe('parseContent', () => {
     expect(parseContent(item, container(undefined))).toEqual({ messages: [] })
   })
 })
+
+describe('parseContent — inline styles', () => {
+  it('collects <style> element contents and style="" attribute values', () => {
+    const { doc } = parseContent(item, container(DOC(
+      '<style>body { color: red; }</style><p style="position: fixed">x</p>',
+    )))
+    const sheets = doc!.inlineStyles.filter((s) => s.context === 'stylesheet').map((s) => s.text)
+    const attrs = doc!.inlineStyles.filter((s) => s.context === 'declarationList').map((s) => s.text)
+    expect(sheets).toEqual(['body { color: red; }'])
+    expect(attrs).toEqual(['position: fixed'])
+  })
+})

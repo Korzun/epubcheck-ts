@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { EpubContainer, Resource } from '../io/zip.js'
 import type { ManifestItem } from './opf.js'
-import { parseCss } from './css.js'
+import { parseCss, analyzeCss } from './css.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 const LOC = { path: 'EPUB/package.opf' }
@@ -49,5 +49,20 @@ describe('parseCss', () => {
 
   it('returns no doc when the resource is absent', () => {
     expect(parseCss(item, container(undefined))).toEqual({ messages: [] })
+  })
+})
+
+describe('analyzeCss', () => {
+  it('analyzes a full stylesheet (context: stylesheet)', () => {
+    const a = analyzeCss('@import "x.css"; body { background: url(bg.png); direction: rtl; }', 'EPUB/c1.xhtml', 'stylesheet')
+    expect(a.refs.map((r) => r.type).sort()).toEqual(['generic', 'import'])
+    expect(a.declarations.some((d) => d.property === 'direction')).toBe(true)
+    expect(a.messages).toHaveLength(0)
+  })
+  it('analyzes a style-attribute value (context: declarationList)', () => {
+    const a = analyzeCss('position: fixed; background: url(bg.png)', 'EPUB/c1.xhtml', 'declarationList')
+    expect(a.declarations.map((d) => d.property)).toContain('position')
+    expect(a.refs.map((r) => r.url)).toEqual(['bg.png'])
+    expect(a.refs[0]?.type).toBe('generic')
   })
 })

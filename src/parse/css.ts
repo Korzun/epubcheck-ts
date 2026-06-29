@@ -25,6 +25,13 @@ export interface CssDocument {
   declarations: CssDeclaration[]
   fontFaces: FontFace[]
 }
+export interface CssAnalysis {
+  parsed: boolean
+  refs: CssRef[]
+  declarations: CssDeclaration[]
+  fontFaces: FontFace[]
+  messages: Message[]
+}
 
 function locOf(node: { loc?: csstree.CssLocation | null } | null | undefined, path: string): Location {
   const start = node?.loc?.start
@@ -70,19 +77,12 @@ function countDeclarations(atrule: csstree.Atrule): number {
   return count
 }
 
-export function parseCss(
-  item: ManifestItem,
-  container: EpubContainer,
-): { css?: CssDocument; messages: Message[] } {
+export function analyzeCss(
+  text: string,
+  path: string,
+  context: 'stylesheet' | 'declarationList',
+): CssAnalysis {
   const messages: Message[] = []
-  const opfPath = container.rootfiles[0]
-  if (!opfPath || !item.href) return { messages }
-
-  const path = resolvePath(opfPath, item.href)
-  const resource = getResource(container, path)
-  if (!resource) return { messages } // missing file is reported as RSC-001 by the OPF manifest check
-
-  const text = new TextDecoder('utf-8').decode(resource.bytes)
   const refs: CssRef[] = []
   const declarations: CssDeclaration[] = []
   const fontFaces: FontFace[] = []
@@ -91,13 +91,14 @@ export function parseCss(
   try {
     ast = csstree.parse(text, {
       positions: true,
+      context,
       onParseError(error) {
         messages.push(msg('CSS-008', { path, line: error.line, column: error.column }, error.message))
       },
     })
   } catch (error) {
     messages.push(msg('CSS-008', { path }, error instanceof Error ? error.message : String(error)))
-    return { messages }
+    return { parsed: false, refs, declarations, fontFaces, messages }
   }
 
   const atruleStack: string[] = []
@@ -134,5 +135,22 @@ export function parseCss(
     },
   })
 
-  return { css: { path, refs, declarations, fontFaces }, messages }
+  return { parsed: true, refs, declarations, fontFaces, messages }
+}
+
+export function parseCss(
+  item: ManifestItem,
+  container: EpubContainer,
+): { css?: CssDocument; messages: Message[] } {
+  const opfPath = container.rootfiles[0]
+  if (!opfPath || !item.href) return { messages: [] }
+
+  const path = resolvePath(opfPath, item.href)
+  const resource = getResource(container, path)
+  if (!resource) return { messages: [] } // missing file is reported as RSC-001 by the OPF manifest check
+
+  const text = new TextDecoder('utf-8').decode(resource.bytes)
+  const a = analyzeCss(text, path, 'stylesheet')
+  if (!a.parsed) return { messages: a.messages }
+  return { css: { path, refs: a.refs, declarations: a.declarations, fontFaces: a.fontFaces }, messages: a.messages }
 }

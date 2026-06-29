@@ -84,3 +84,15 @@ describe('validateContentDocs — elements', () => {
     expect(ids({ 'c1.xhtml': '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>' })).toEqual([])
   })
 })
+
+describe('validateContentDocs — inline CSS', () => {
+  it('RSC-007 for a missing url() in a <style> element', () => {
+    expect(ids({ 'c1.xhtml': '<style>body { background: url(missing.png); }</style>' })).toContain('RSC-007')
+  })
+  it('CSS-006 for position:fixed in a style attribute', () => {
+    expect(ids({ 'c1.xhtml': '<p style="position: fixed">x</p>' })).toContain('CSS-006')
+  })
+  it('CSS-001 for direction in a <style> element', () => {
+    expect(ids({ 'c1.xhtml': '<style>p { direction: rtl; }</style>' })).toContain('CSS-001')
+  })
+})
