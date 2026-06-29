@@ -26,7 +26,7 @@
 - **RSC-011** — template `Found a reference to a resource that is not a spine item.` (no positional args), severity **ERROR**. Fires for a `HYPERLINK` reference whose local target is a blessed content document (so RSC-010 did not fire) but is **not in the spine**.
 - **RSC-031** — template `Remote resource references should use HTTPS, but found "%1$s".` (`%1$s` = the URL), severity **WARNING**. **Already in the catalog and already implemented for CSS** (`src/checks/css.ts`). This plan extends it to content references: a remote, non-HYPERLINK reference whose scheme is neither `https` nor `file` (in practice: a remote `audio`/`video`/`cite` ref over `http://`).
 
-"Blessed content-document type" for our purposes = `application/xhtml+xml`, `image/svg+xml`, plus the deprecated-blessed `application/x-dtbncx+xml` and `application/x-dtbook+xml`.
+"Blessed content-document type" for our purposes (EPUB 3) = `application/xhtml+xml`, `image/svg+xml`, plus the deprecated-blessed `text/x-oeb1-document` and `text/html`.
 
 ### Current code this plan extends (already on `main`)
 
@@ -201,8 +201,8 @@ In `src/checks/content.ts`, add these module-level constants/functions (place th
 const BLESSED_CONTENT_TYPES: ReadonlySet<string> = new Set<string>([
   'application/xhtml+xml',
   'image/svg+xml',
-  'application/x-dtbncx+xml', // deprecated-blessed
-  'application/x-dtbook+xml', // deprecated-blessed
+  'text/x-oeb1-document', // deprecated-blessed
+  'text/html', // deprecated-blessed
 ])
 
 function isBlessedContentType(mediaType: string | undefined): boolean {

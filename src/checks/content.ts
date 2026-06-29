@@ -11,11 +11,13 @@ import { validateCss } from './css.js'
 const REMOTE_ALLOWED: ReadonlySet<RefType> = new Set<RefType>(['hyperlink', 'cite', 'audio', 'video'])
 const HTML_NS = 'http://www.w3.org/1999/xhtml'
 
+// EPUB 3 blessed content-document types (epubcheck isBlessedItemType v3) plus
+// deprecated-blessed types (epubcheck isDeprecatedBlessedItemType).
 const BLESSED_CONTENT_TYPES: ReadonlySet<string> = new Set<string>([
   'application/xhtml+xml',
   'image/svg+xml',
-  'application/x-dtbncx+xml', // deprecated-blessed
-  'application/x-dtbook+xml', // deprecated-blessed
+  'text/x-oeb1-document', // deprecated-blessed
+  'text/html', // deprecated-blessed
 ])
 
 function isBlessedContentType(mediaType: string | undefined): boolean {

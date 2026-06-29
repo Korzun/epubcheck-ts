@@ -137,6 +137,25 @@ describe('validateContentDocs — hyperlink targets', () => {
     container.resources.set('EPUB/fb.xhtml', { path: 'EPUB/fb.xhtml', bytes: enc(DOC('<p>fb</p>')), compression: 'deflate' })
     expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-010')
   })
+
+  it('RSC-011 (not RSC-010) for a hyperlink to a text/html doc not in the spine — text/html is deprecated-blessed', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<a href="c2.html">x</a>' })
+    // c2 is a declared text/html doc (deprecated-blessed content type), present but NOT in the spine.
+    pkg.manifest.push({ id: 'c2', href: 'c2.html', mediaType: 'text/html', properties: [], loc: LOC })
+    container.resources.set('EPUB/c2.html', { path: 'EPUB/c2.html', bytes: enc('<html></html>'), compression: 'deflate' })
+    const out = validateContentDocs(pkg, container).map((m) => m.id)
+    expect(out).toContain('RSC-011')
+    expect(out).not.toContain('RSC-010')
+  })
+
+  it('RSC-010 for a hyperlink to application/x-dtbncx+xml — NCX is not a blessed content type', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<a href="toc.ncx">x</a>' })
+    pkg.manifest.push({ id: 'ncx', href: 'toc.ncx', mediaType: 'application/x-dtbncx+xml', properties: [], loc: LOC })
+    container.resources.set('EPUB/toc.ncx', { path: 'EPUB/toc.ncx', bytes: enc('<ncx/>'), compression: 'deflate' })
+    const out = validateContentDocs(pkg, container).map((m) => m.id)
+    expect(out).toContain('RSC-010')
+    expect(out).not.toContain('RSC-011')
+  })
 })
 
 describe('validateContentDocs — remote HTTPS', () => {
