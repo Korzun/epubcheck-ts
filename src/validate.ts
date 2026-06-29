@@ -5,6 +5,7 @@ import { validateOpf } from './checks/opf.js'
 import { parseNav } from './parse/nav.js'
 import { validateNav } from './checks/nav.js'
 import { validateContentDocs } from './checks/content.js'
+import { validateCssDocs } from './checks/css.js'
 import { buildReport, type Report } from './report.js'
 import { msg, type Message } from './messages/format.js'
 
@@ -42,6 +43,7 @@ export async function validateEpub(
           if (nav) messages.push(...validateNav(nav, pkg, container))
         }
         messages.push(...validateContentDocs(pkg, container))
+        messages.push(...validateCssDocs(pkg, container))
       }
     }
 

@@ -31,4 +31,13 @@ export const CATALOG: Record<string, { severity: Severity; template: string }> =
   'NAV-010': { severity: 'ERROR', template: '"%1$s" nav must not link to remote resources; found link to "%2$s".' },
   // Internal
   'CHK-001': { severity: 'FATAL', template: 'An internal error occurred while validating: %1$s' },
+  // CSS
+  'CSS-001': { severity: 'ERROR', template: 'The "%1$s" property must not be included in an EPUB Style Sheet.' },
+  'CSS-002': { severity: 'ERROR', template: 'Empty or NULL reference found.' },
+  'CSS-006': { severity: 'USAGE', template: 'CSS selector specifies fixed position.' },
+  'CSS-008': { severity: 'ERROR', template: 'An error occurred while parsing the CSS: %1$s.' },
+  'CSS-019': { severity: 'WARNING', template: 'CSS font-face declaration has no attributes.' },
+  'RSC-013': { severity: 'ERROR', template: 'Fragment identifier is used in a reference to a stylesheet resource.' },
+  'RSC-030': { severity: 'ERROR', template: 'File URLs are not allowed in EPUB, but found "%1$s".' },
+  'RSC-031': { severity: 'WARNING', template: 'Remote resource references should use HTTPS, but found "%1$s".' },
 }

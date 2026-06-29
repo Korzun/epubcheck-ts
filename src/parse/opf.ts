@@ -1,6 +1,7 @@
 import { parseXml, childElements, type XmlNode } from '../io/xml.js'
 import { getResource, type EpubContainer } from '../io/zip.js'
 import { msg, type Location, type Message } from '../messages/format.js'
+import { resolvePath, isRemote } from '../util/path.js'
 
 const DC_NS = 'http://purl.org/dc/elements/1.1/'
 
@@ -127,4 +128,13 @@ export function parseOpf(container: EpubContainer): { pkg?: PackageDocument; mes
     loc: root.loc,
   }
   return { pkg, messages }
+}
+
+/** Resolved-container-path → manifest item, for non-remote manifest hrefs. */
+export function manifestPathMap(pkg: PackageDocument): Map<string, ManifestItem> {
+  const map = new Map<string, ManifestItem>()
+  for (const item of pkg.manifest) {
+    if (item.href && !isRemote(item.href)) map.set(resolvePath(pkg.path, item.href), item)
+  }
+  return map
 }
