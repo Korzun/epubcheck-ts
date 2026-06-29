@@ -217,6 +217,22 @@ export const CORPUS: Fixture[] = [
     epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><audio src="http://example.com/a.mp3"></audio></p>') } }),
     expected: [E('RSC-031', 'WARNING')],
   },
+  {
+    name: 'content-foreign-resource-no-fallback',
+    area: 'content',
+    description: 'content img@src targets a non-core media type with no fallback (epubcheck RSC-032)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace(
+          '</manifest>',
+          '<item id="tiff" href="diagram.tiff" media-type="image/tiff"/></manifest>',
+        ),
+        'EPUB/diagram.tiff': 'TIFFDATA',
+        'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><img src="diagram.tiff"/></p>'),
+      },
+    }),
+    expected: [E('RSC-032', 'ERROR')],
+  },
 
   // ---- CSS (mirrors epub3/06-content-document css scenarios) ----
   { name: 'css-valid', area: 'css', description: 'valid EPUB with a stylesheet', epub: cssEpub('p { color: red; }'), expected: [] },

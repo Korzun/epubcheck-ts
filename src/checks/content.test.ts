@@ -173,3 +173,42 @@ describe('validateContentDocs — remote HTTPS', () => {
     expect(ids({ 'c1.xhtml': '<a href="http://example.com/">x</a>' })).not.toContain('RSC-031')
   })
 })
+
+describe('validateContentDocs — foreign-resource fallback', () => {
+  it('RSC-032 for an <img> whose target is a non-core media type with no fallback', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<img src="diagram.tiff"/>' })
+    pkg.manifest.push({ id: 'tiff', href: 'diagram.tiff', mediaType: 'image/tiff', properties: [], loc: LOC })
+    container.resources.set('EPUB/diagram.tiff', { path: 'EPUB/diagram.tiff', bytes: enc('x'), compression: 'deflate' })
+    expect(validateContentDocs(pkg, container).map((m) => m.id)).toContain('RSC-032')
+  })
+
+  it('no RSC-032 when the image target is a core media type', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<img src="ok.png"/>' })
+    pkg.manifest.push({ id: 'png', href: 'ok.png', mediaType: 'image/png', properties: [], loc: LOC })
+    container.resources.set('EPUB/ok.png', { path: 'EPUB/ok.png', bytes: enc('x'), compression: 'deflate' })
+    expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-032')
+  })
+
+  it('no RSC-032 when the non-core target has a core-media-type fallback in the manifest', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<img src="diagram.tiff"/>' })
+    pkg.manifest.push({ id: 'tiff', href: 'diagram.tiff', mediaType: 'image/tiff', properties: [], fallback: 'png', loc: LOC })
+    pkg.manifest.push({ id: 'png', href: 'ok.png', mediaType: 'image/png', properties: [], loc: LOC })
+    container.resources.set('EPUB/diagram.tiff', { path: 'EPUB/diagram.tiff', bytes: enc('x'), compression: 'deflate' })
+    container.resources.set('EPUB/ok.png', { path: 'EPUB/ok.png', bytes: enc('x'), compression: 'deflate' })
+    expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-032')
+  })
+
+  it('no RSC-032 for a non-core image inside <picture> (intrinsic fallback)', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<picture><img src="diagram.tiff"/></picture>' })
+    pkg.manifest.push({ id: 'tiff', href: 'diagram.tiff', mediaType: 'image/tiff', properties: [], loc: LOC })
+    container.resources.set('EPUB/diagram.tiff', { path: 'EPUB/diagram.tiff', bytes: enc('x'), compression: 'deflate' })
+    expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-032')
+  })
+
+  it('no RSC-032 for a video/* target (all video types are core media types)', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<video src="m.mkv"></video>' })
+    pkg.manifest.push({ id: 'vid', href: 'm.mkv', mediaType: 'video/x-matroska', properties: [], loc: LOC })
+    container.resources.set('EPUB/m.mkv', { path: 'EPUB/m.mkv', bytes: enc('x'), compression: 'deflate' })
+    expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-032')
+  })
+})
