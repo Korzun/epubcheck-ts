@@ -170,6 +170,24 @@ export const CORPUS: Fixture[] = [
     epub: buildEpub({ files: { 'EPUB/nav.xhtml': NAV.replace('href="content_001.xhtml"', 'href="https://example.com/x"') } }),
     expected: [E('NAV-010', 'ERROR')],
   },
+  {
+    name: 'nav-reading-order',
+    area: 'nav',
+    description: 'toc links are not in spine reading order (epubcheck NAV-011)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF
+          .replace('</manifest>', '<item id="content2" href="content_002.xhtml" media-type="application/xhtml+xml"/></manifest>')
+          .replace('<itemref idref="content"/>', '<itemref idref="content"/><itemref idref="content2"/>'),
+        'EPUB/content_002.xhtml': CONTENT,
+        'EPUB/nav.xhtml': NAV.replace(
+          '<nav epub:type="toc"><ol><li><a href="content_001.xhtml">Content</a></li></ol></nav>',
+          '<nav epub:type="toc"><ol><li><a href="content_002.xhtml">Two</a></li><li><a href="content_001.xhtml">One</a></li></ol></nav>',
+        ),
+      },
+    }),
+    expected: [E('NAV-011', 'WARNING')],
+  },
 
   // ---- Content references (mirrors epub3/06-content-document) ----
   {
