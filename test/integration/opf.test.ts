@@ -26,9 +26,16 @@ const VALID_OPF =
   '<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest>' +
   '<spine><itemref idref="nav"/></spine></package>'
 
+const VALID_NAV = enc(
+  '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">' +
+    '<head><title>t</title></head><body>' +
+    '<nav epub:type="toc"><ol><li><a href="nav.xhtml">Nav</a></li></ol></nav>' +
+    '</body></html>',
+)
+
 describe('integration: OPF validation', () => {
   it('reports no OPF errors for a valid EPUB 3 package', async () => {
-    const report = await validateEpub(epub(VALID_OPF, { 'EPUB/nav.xhtml': enc('<html/>') }))
+    const report = await validateEpub(epub(VALID_OPF, { 'EPUB/nav.xhtml': VALID_NAV }))
     const opfIds = report.messages.map((m) => m.id).filter((id) => id.startsWith('OPF') || id === 'RSC-001' || id === 'RSC-005')
     expect(opfIds).toEqual([])
     expect(report.epubVersion).toBe('3.0')
@@ -40,7 +47,7 @@ describe('integration: OPF validation', () => {
       '</manifest>',
       '<item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest>',
     )
-    const report = await validateEpub(epub(opf, { 'EPUB/nav.xhtml': enc('<html/>') }))
+    const report = await validateEpub(epub(opf, { 'EPUB/nav.xhtml': VALID_NAV }))
     expect(report.messages.map((m) => m.id)).toContain('RSC-001')
     expect(report.valid).toBe(false)
   })
