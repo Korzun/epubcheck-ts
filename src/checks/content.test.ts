@@ -56,3 +56,18 @@ describe('validateContentDocs — references', () => {
     expect(ids({ 'c1.xhtml': '<a href="mailto:a@b.com">m</a><a href="#top">t</a><span id="top"/>' })).toEqual([])
   })
 })
+
+describe('validateContentDocs — fragments', () => {
+  it('RSC-012 when a same-document fragment id is missing', () => {
+    expect(ids({ 'c1.xhtml': '<a href="#nope">x</a>' })).toContain('RSC-012')
+  })
+  it('passes when a same-document fragment id exists', () => {
+    expect(ids({ 'c1.xhtml': '<a href="#here">x</a><span id="here"/>' })).toEqual([])
+  })
+  it('RSC-012 when a cross-document fragment id is missing', () => {
+    expect(ids({ 'c1.xhtml': '<a href="c2.xhtml#nope">x</a>', 'c2.xhtml': '<p id="other">2</p>' })).toContain('RSC-012')
+  })
+  it('passes when a cross-document fragment id exists', () => {
+    expect(ids({ 'c1.xhtml': '<a href="c2.xhtml#ok">x</a>', 'c2.xhtml': '<p id="ok">2</p>' })).toEqual([])
+  })
+})

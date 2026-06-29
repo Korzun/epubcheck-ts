@@ -36,6 +36,41 @@ export function validateContentDocs(pkg: PackageDocument, container: EpubContain
 
   for (const doc of docs.values()) {
     messages.push(...checkReferences(doc, container, manifest))
+    messages.push(...checkFragments(doc, docs, manifest))
+  }
+  return messages
+}
+
+function isFragmentCheckable(mediaType: string | undefined): boolean {
+  return mediaType === 'application/xhtml+xml'
+}
+
+function checkFragments(
+  doc: ContentDocument,
+  docs: Map<string, ContentDocument>,
+  manifest: Map<string, ManifestItem>,
+): Message[] {
+  const messages: Message[] = []
+  for (const ref of doc.refs) {
+    const hash = ref.url.indexOf('#')
+    if (hash < 0) continue
+    const frag = ref.url.slice(hash + 1)
+    if (frag === '') continue
+    const base = ref.url.slice(0, hash)
+
+    let ids: Set<string> | undefined
+    if (base === '') {
+      ids = doc.ids // same-document
+    } else {
+      if (isRemote(ref.url) || hasScheme(base)) continue
+      const target = resolvePath(doc.path, base)
+      const item = manifest.get(target)
+      if (!item || !isFragmentCheckable(item.mediaType)) continue // only id-check XHTML targets
+      ids = docs.get(target)?.ids
+      if (!ids) continue // target XHTML wasn't parsed (e.g. the nav doc, which we skip)
+    }
+
+    if (!ids.has(frag)) messages.push(msg('RSC-012', ref.loc))
   }
   return messages
 }
