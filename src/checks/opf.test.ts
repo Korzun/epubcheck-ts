@@ -136,7 +136,7 @@ describe('checkUndeclaredResources', () => {
   }
   function containerWith(paths: string[]): EpubContainer {
     const resources = new Map<string, Resource>()
-    for (const p of paths) resources.set(p, { path: p, bytes: new Uint8Array(), compression: 'deflate' })
+    for (const p of paths) resources.set(p, { path: p, bytes: enc(''), compression: 'deflate' })
     return { resources, rootfiles: ['EPUB/package.opf'], hasEncryption: false }
   }
 
