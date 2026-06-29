@@ -138,6 +138,13 @@ export const CORPUS: Fixture[] = [
     epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace('<dc:identifier id="uid">', '<dc:identifier id="other">') } }),
     expected: [E('OPF-030', 'ERROR')],
   },
+  {
+    name: 'opf-undeclared-resource',
+    area: 'opf',
+    description: 'a container file is not declared in the manifest (epubcheck OPF-003, usage)',
+    epub: buildEpub({ files: { 'EPUB/orphan.txt': 'orphan' } }),
+    expected: [E('OPF-003', 'USAGE')],
+  },
 
   // ---- Navigation (mirrors epub3/07-navigation-document) ----
   {
@@ -215,7 +222,7 @@ export const CORPUS: Fixture[] = [
     area: 'css',
     description: '@import target is present but not in the manifest (epubcheck RSC-008)',
     epub: cssEpub('@import "extra.css";', { 'EPUB/extra.css': 'p{}' }),
-    expected: [E('RSC-008', 'ERROR')],
+    expected: [E('RSC-008', 'ERROR'), E('OPF-003', 'USAGE')],
   },
   {
     name: 'css-remote-image',
@@ -229,7 +236,7 @@ export const CORPUS: Fixture[] = [
     area: 'css',
     description: 'supplementary: @import url has a fragment (RSC-013) + target undeclared (RSC-008)',
     epub: cssEpub('@import "other.css#x";', { 'EPUB/other.css': 'p{}' }),
-    expected: [E('RSC-013', 'ERROR'), E('RSC-008', 'ERROR')],
+    expected: [E('RSC-013', 'ERROR'), E('RSC-008', 'ERROR'), E('OPF-003', 'USAGE')],
   },
   {
     name: 'css-file-url',
