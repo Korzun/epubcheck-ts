@@ -46,6 +46,7 @@ declare module 'css-tree' {
   }
   export interface ParseOptions {
     positions?: boolean
+    context?: string
     onParseError?: (error: ParseError) => void
   }
   type WalkerFn = (node: CssNode) => void
