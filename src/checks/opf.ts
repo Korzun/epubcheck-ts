@@ -1,12 +1,32 @@
 import { getResource, type EpubContainer } from '../io/zip.js'
 import { resolvePath, isRemote } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
-import type { PackageDocument } from '../parse/opf.js'
+import { manifestPathMap, type PackageDocument } from '../parse/opf.js'
 
 const XHTML_MEDIA_TYPE = 'application/xhtml+xml'
 
 export function validateOpf(pkg: PackageDocument, container: EpubContainer): Message[] {
   return [...checkPackage(pkg), ...checkManifest(pkg, container), ...checkSpineAndNav(pkg)]
+}
+
+/**
+ * OPF-003: a container resource that is not declared in the manifest.
+ * Excludes `mimetype`, everything under `META-INF/`, and the rootfile package
+ * document(s). (epubcheck also exempts EPUB 3 OPF `<link>` resources and the
+ * Multiple-Renditions mapping document, which we do not model.)
+ */
+export function checkUndeclaredResources(pkg: PackageDocument, container: EpubContainer): Message[] {
+  const messages: Message[] = []
+  const declared = manifestPathMap(pkg)
+  const rootfiles = new Set(container.rootfiles)
+  for (const path of container.resources.keys()) {
+    if (path === 'mimetype') continue
+    if (path.startsWith('META-INF/')) continue
+    if (rootfiles.has(path)) continue
+    if (declared.has(path)) continue
+    messages.push(msg('OPF-003', { path }, path))
+  }
+  return messages
 }
 
 function checkPackage(pkg: PackageDocument): Message[] {
