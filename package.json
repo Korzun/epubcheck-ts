@@ -1,9 +1,12 @@
 {
-  "name": "epubcheck-ts",
+  "name": "@korzun/epubcheck-ts",
   "version": "0.0.0",
   "description": "A TypeScript-native EPUB validator (library).",
   "type": "module",
   "license": "BSD-3-Clause",
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

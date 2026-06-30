@@ -10,8 +10,8 @@ dependency and no Node-specific APIs, so it runs anywhere the Web Platform's
 `Uint8Array` and `ReadableStream` are available (Node, Deno, Bun, browsers,
 edge runtimes).
 
-> **Not the same package as [`@likecoin/epubcheck-ts`](https://www.npmjs.com/package/@likecoin/epubcheck-ts).**
-> Despite the shared name, that is a separate, more mature project. See
+> **Not to be confused with [`@likecoin/epubcheck-ts`](https://www.npmjs.com/package/@likecoin/epubcheck-ts).**
+> Despite the similar name, that is a separate, more mature project. See
 > [How this compares](#how-this-compares-to-likecoinepubcheck-ts) below.
 
 ## How this compares to `@likecoin/epubcheck-ts`
@@ -66,7 +66,7 @@ content documents, and stylesheets:
 ## Installation
 
 ```sh
-npm install epubcheck-ts
+npm install @korzun/epubcheck-ts
 ```
 
 ## Usage
@@ -76,7 +76,7 @@ npm install epubcheck-ts
 
 ```ts
 import { readFile } from 'node:fs/promises'
-import { validateEpub } from 'epubcheck-ts'
+import { validateEpub } from '@korzun/epubcheck-ts'
 
 const bytes = await readFile('book.epub')
 const report = await validateEpub(bytes)
@@ -96,7 +96,7 @@ if (report.valid) {
 The package is published as both ESM and CommonJS, so `require` works too:
 
 ```js
-const { validateEpub } = require('epubcheck-ts')
+const { validateEpub } = require('@korzun/epubcheck-ts')
 ```
 
 ### Options
@@ -139,7 +139,7 @@ import {
   validateOcf,
   parseOpf,
   validateOpf,
-} from 'epubcheck-ts'
+} from '@korzun/epubcheck-ts'
 
 const container = await openEpub(bytes)
 const ocfMessages = validateOcf(container)
