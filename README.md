@@ -10,6 +10,34 @@ dependency and no Node-specific APIs, so it runs anywhere the Web Platform's
 `Uint8Array` and `ReadableStream` are available (Node, Deno, Bun, browsers,
 edge runtimes).
 
+> **Not the same package as [`@likecoin/epubcheck-ts`](https://www.npmjs.com/package/@likecoin/epubcheck-ts).**
+> Despite the shared name, that is a separate, more mature project. See
+> [How this compares](#how-this-compares-to-likecoinepubcheck-ts) below.
+
+## How this compares to `@likecoin/epubcheck-ts`
+
+[`@likecoin/epubcheck-ts`](https://github.com/likecoin/epubcheck-ts) is an
+established, near-complete TypeScript port of the official EPUBCheck. If you
+need maximum conformance today, use it (or the official Java EPUBCheck). The two
+projects make deliberately different trade-offs:
+
+| | epubcheck-ts (this project) | `@likecoin/epubcheck-ts` |
+| --- | --- | --- |
+| Goal | A small, embeddable, dependency-light validator | Near-complete parity (~99%) with Java EPUBCheck |
+| Maturity | Early-stage; a curated subset of checks | Mature; ~1300 tests, EPUB 2.0 & 3.0–3.3 |
+| Validation approach | Hand-written checks against parsed structures | Ports EPUBCheck's RELAX NG / Schematron / XSD schemas |
+| Schema engine | None | `libxml2-wasm` + `fontoxpath` + `slimdom` (XPath 3.1) |
+| Runtime deps | 3 (`fflate`, `saxes`, `css-tree`) — no WASM | 6, including a WASM libxml2 build |
+| Interface | Library only | Library **and** CLI (`npx`, profiles, JSON output) |
+| API style | Functional & layered — compose the parse/check steps | Higher-level validator API |
+| Footprint | Minimal | Larger (WASM payload) |
+
+In short: reach for `@likecoin/epubcheck-ts` when you want the most complete,
+schema-accurate validation or a ready-made CLI. Reach for this project when you
+want a tiny, WASM-free, functionally composable library and are comfortable with
+a smaller (but growing) set of checks. Both reuse epubcheck's message-id
+vocabulary, so their output is broadly compatible.
+
 ## Features
 
 - **EPUB 2 and EPUB 3** — version is auto-detected from the package document.
