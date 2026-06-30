@@ -384,6 +384,32 @@ export const CORPUS: Fixture[] = [
     expected: [E('CSS-005', 'USAGE')],
   },
   {
+    name: 'css-charset-non-utf8',
+    area: 'css',
+    description: 'CSS @charset declares a non-UTF-8 encoding (epubcheck CSS-004)',
+    epub: cssEpub('@charset "iso-8859-1";\np { color: red; }'),
+    expected: [E('CSS-004', 'ERROR')],
+  },
+  {
+    name: 'css-encoding-utf16',
+    area: 'css',
+    description: 'CSS file is UTF-16 (BOM) and should be UTF-8 (epubcheck CSS-003)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace(
+          '</manifest>',
+          '<item id="css" href="style.css" media-type="text/css"/></manifest>',
+        ),
+        'EPUB/content_001.xhtml': CONTENT.replace(
+          '<head><title>t</title></head>',
+          '<head><title>t</title><link rel="stylesheet" href="style.css"/></head>',
+        ),
+        'EPUB/style.css': new Uint8Array([0xff, 0xfe, 0x70, 0x00, 0x7b, 0x00, 0x7d, 0x00]), // UTF-16LE BOM + "p{}"
+      },
+    }),
+    expected: [E('CSS-003', 'WARNING')],
+  },
+  {
     name: 'inline-style-element-url-missing',
     area: 'css',
     description: 'supplementary: <style> element url() target missing (RSC-007)',

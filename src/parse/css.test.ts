@@ -66,3 +66,35 @@ describe('analyzeCss', () => {
     expect(a.refs[0]?.type).toBe('generic')
   })
 })
+
+describe('parseCss — encoding', () => {
+  function bytesContainer(bytes: Uint8Array, path = 'EPUB/styles/s.css'): EpubContainer {
+    const resources = new Map<string, Resource>()
+    resources.set(path, { path, bytes, compression: 'deflate' })
+    return { resources, rootfiles: ['EPUB/package.opf'], hasEncryption: false }
+  }
+
+  it('CSS-003 for a UTF-16 (BOM) stylesheet and returns no document', () => {
+    const { css, messages } = parseCss(item, bytesContainer(new Uint8Array([0xff, 0xfe, 0x70, 0x00])))
+    expect(messages.map((m) => m.id)).toContain('CSS-003')
+    expect(css).toBeUndefined()
+  })
+
+  it('CSS-004 for a non-UTF-8 @charset and returns no document', () => {
+    const { css, messages } = parseCss(item, container('@charset "iso-8859-1";\np { color: red; }'))
+    expect(messages.map((m) => m.id)).toContain('CSS-004')
+    expect(css).toBeUndefined()
+  })
+
+  it('no encoding message for a plain UTF-8 stylesheet', () => {
+    const { messages } = parseCss(item, container('p { color: red; }'))
+    expect(messages.map((m) => m.id)).not.toContain('CSS-003')
+    expect(messages.map((m) => m.id)).not.toContain('CSS-004')
+  })
+
+  it('no encoding message for a UTF-8 @charset', () => {
+    const { css, messages } = parseCss(item, container('@charset "utf-8";\np { color: red; }'))
+    expect(messages.map((m) => m.id)).not.toContain('CSS-004')
+    expect(css).toBeDefined()
+  })
+})

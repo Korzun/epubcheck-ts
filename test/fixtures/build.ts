@@ -36,8 +36,8 @@ export const CONTENT =
   '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body><p>Hello</p></body></html>'
 
 export interface EpubOverrides {
-  /** container-path → text content; overrides/extends the baseline. */
-  files?: Record<string, string>
+  /** container-path → text or raw bytes; overrides/extends the baseline. */
+  files?: Record<string, string | Uint8Array>
   /** container-paths to remove from the baseline (e.g. 'mimetype'). */
   omit?: string[]
   /** compress the mimetype entry (deflate) instead of storing it (for PKG-005). */
@@ -45,20 +45,20 @@ export interface EpubOverrides {
 }
 
 export function buildEpub(o: EpubOverrides = {}): Uint8Array {
-  const base: Record<string, string> = {
+  const base: Record<string, string | Uint8Array> = {
     mimetype: MIMETYPE,
     'META-INF/container.xml': CONTAINER,
     'EPUB/package.opf': OPF,
     'EPUB/nav.xhtml': NAV,
     'EPUB/content_001.xhtml': CONTENT,
   }
-  const merged: Record<string, string> = { ...base, ...(o.files ?? {}) }
+  const merged: Record<string, string | Uint8Array> = { ...base, ...(o.files ?? {}) }
   for (const k of o.omit ?? []) delete merged[k]
 
   const entries: Record<string, [Uint8Array, { level: 0 | 6 }]> = {}
-  for (const [path, text] of Object.entries(merged)) {
+  for (const [path, content] of Object.entries(merged)) {
     const level: 0 | 6 = path === 'mimetype' ? (o.mimetypeDeflate ? 6 : 0) : 6
-    entries[path] = [enc(text), { level }]
+    entries[path] = [typeof content === 'string' ? enc(content) : content, { level }]
   }
   return zipSync(entries)
 }
