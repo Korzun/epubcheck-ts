@@ -189,6 +189,46 @@ export const CORPUS: Fixture[] = [
     expected: [E('NAV-011', 'WARNING')],
   },
   {
+    name: 'nav-reading-order-fragments',
+    area: 'nav',
+    description: 'toc links to fragments of the same spine item are out of document order (epubcheck NAV-011 x2)',
+    epub: buildEpub({
+      files: {
+        'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<h2 id="ch1">1</h2><h2 id="ch2">2</h2><h2 id="ch3">3</h2>'),
+        'EPUB/nav.xhtml': NAV.replace(
+          '<nav epub:type="toc"><ol><li><a href="content_001.xhtml">Content</a></li></ol></nav>',
+          '<nav epub:type="toc"><ol>' +
+            '<li><a href="content_001.xhtml#ch1">1</a></li>' +
+            '<li><a href="content_001.xhtml">M</a></li>' +
+            '<li><a href="content_001.xhtml#ch3">3</a></li>' +
+            '<li><a href="content_001.xhtml#ch2">2</a></li>' +
+            '</ol></nav>',
+        ),
+      },
+    }),
+    expected: [E('NAV-011', 'WARNING'), E('NAV-011', 'WARNING')],
+  },
+  {
+    name: 'nav-reading-order-fragments-valid',
+    area: 'nav',
+    description: 'toc links to fragments of the same spine item in correct document order (valid; no NAV-011)',
+    epub: buildEpub({
+      files: {
+        'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<h2 id="ch1">1</h2><h2 id="ch2">2</h2><h2 id="ch3">3</h2>'),
+        'EPUB/nav.xhtml': NAV.replace(
+          '<nav epub:type="toc"><ol><li><a href="content_001.xhtml">Content</a></li></ol></nav>',
+          '<nav epub:type="toc"><ol>' +
+            '<li><a href="content_001.xhtml">M</a></li>' +
+            '<li><a href="content_001.xhtml#ch1">1</a></li>' +
+            '<li><a href="content_001.xhtml#ch2">2</a></li>' +
+            '<li><a href="content_001.xhtml#ch3">3</a></li>' +
+            '</ol></nav>',
+        ),
+      },
+    }),
+    expected: [],
+  },
+  {
     name: 'nav-link-missing-target',
     area: 'nav',
     description: 'nav toc link points to a missing file (epubcheck RSC-007, via content validation of the nav doc)',

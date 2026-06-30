@@ -28,12 +28,12 @@ function navDoc(body: string, targets: string[] = ['EPUB/c1.xhtml']): { nav: Nav
   return { nav: nav!, pkg, container }
 }
 const ids = (body: string, targets?: string[]) => {
-  const { nav, pkg } = navDoc(body, targets)
-  return validateNav(nav, pkg).map((m) => m.id)
+  const { nav, pkg, container } = navDoc(body, targets)
+  return validateNav(nav, pkg, container).map((m) => m.id)
 }
 const msgs = (body: string, targets?: string[]) => {
-  const { nav, pkg } = navDoc(body, targets)
-  return validateNav(nav, pkg)
+  const { nav, pkg, container } = navDoc(body, targets)
+  return validateNav(nav, pkg, container)
 }
 
 const TOC = '<nav epub:type="toc"><ol><li><a href="c1.xhtml">One</a></li></ol></nav>'
@@ -126,7 +126,7 @@ describe('validateNav — reading order (NAV-011)', () => {
       ],
       loc: LOC,
     }
-    return validateNav(nav!, pkg).map((m) => m.id)
+    return validateNav(nav!, pkg, container).map((m) => m.id)
   }
 
   it('NAV-011 when toc links go backwards in spine order', () => {
@@ -144,5 +144,52 @@ describe('validateNav — reading order (NAV-011)', () => {
     const body = '<nav epub:type="toc"><ol>' +
       '<li><a href="c1.xhtml">1</a></li><li><a href="nav.xhtml">n</a></li><li><a href="c2.xhtml">2</a></li></ol></nav>'
     expect(twoSpine(body)).not.toContain('NAV-011')
+  })
+})
+
+describe('validateNav — reading order document sub-case (NAV-011)', () => {
+  // One spine item (c1) whose body provides the id'd elements; nav links into it.
+  function oneSpineFragments(navBody: string, contentBody: string): string[] {
+    const navXml =
+      '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>t</title></head><body>' +
+      navBody + '</body></html>'
+    const contentXml =
+      '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body>' + contentBody + '</body></html>'
+    const resources = new Map<string, Resource>()
+    resources.set('EPUB/nav.xhtml', { path: 'EPUB/nav.xhtml', bytes: enc(navXml), compression: 'deflate' })
+    resources.set('EPUB/c1.xhtml', { path: 'EPUB/c1.xhtml', bytes: enc(contentXml), compression: 'deflate' })
+    const container: EpubContainer = { resources, rootfiles: ['EPUB/package.opf'], hasEncryption: false }
+    const { nav } = parseNav(navItem, container)
+    const pkg: PackageDocument = {
+      path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
+      metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
+      manifest: [navItem, { id: 'c1', href: 'c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }],
+      spinePresent: true, spine: [{ idref: 'c1', linear: true, properties: [], loc: LOC }], loc: LOC,
+    }
+    return validateNav(nav!, pkg, container).map((m) => m.id)
+  }
+
+  it('NAV-011 when toc fragment links are out of document order', () => {
+    const out = oneSpineFragments(
+      '<nav epub:type="toc"><ol><li><a href="c1.xhtml#p2">2</a></li><li><a href="c1.xhtml#p1">1</a></li></ol></nav>',
+      '<p id="p1">1</p><p id="p2">2</p>',
+    )
+    expect(out).toContain('NAV-011')
+  })
+
+  it('no NAV-011 when toc fragment links are in document order', () => {
+    const out = oneSpineFragments(
+      '<nav epub:type="toc"><ol><li><a href="c1.xhtml#p1">1</a></li><li><a href="c1.xhtml#p2">2</a></li></ol></nav>',
+      '<p id="p1">1</p><p id="p2">2</p>',
+    )
+    expect(out).not.toContain('NAV-011')
+  })
+
+  it('no NAV-011 when the fragment id is not found in the target document', () => {
+    const out = oneSpineFragments(
+      '<nav epub:type="toc"><ol><li><a href="c1.xhtml#p2">2</a></li><li><a href="c1.xhtml#nope">x</a></li></ol></nav>',
+      '<p id="p2">2</p>',
+    )
+    expect(out).not.toContain('NAV-011')
   })
 })

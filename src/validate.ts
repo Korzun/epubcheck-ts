@@ -46,7 +46,7 @@ export async function validateEpub(
         if (navItem) {
           const { nav, messages: navMessages } = parseNav(navItem, container)
           messages.push(...navMessages)
-          if (nav) messages.push(...validateNav(nav, pkg))
+          if (nav) messages.push(...validateNav(nav, pkg, container))
         }
         messages.push(...validateContentDocs(pkg, container))
         messages.push(...validateCssDocs(pkg, container))
