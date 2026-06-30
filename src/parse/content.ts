@@ -36,6 +36,8 @@ export interface ContentDocument {
   root: XmlNode
   refs: ContentRef[]
   ids: Set<string>
+  /** id attribute value → 1-based ordinal among id-bearing elements in document order (first occurrence wins). */
+  idPositions: Map<string, number>
   inlineStyles: InlineStyle[]
 }
 
@@ -122,13 +124,17 @@ function collect(
   parent: string | undefined,
   refs: ContentRef[],
   ids: Set<string>,
+  idPositions: Map<string, number>,
   inlineStyles: InlineStyle[],
 ): void {
   for (const child of node.children ?? []) {
     if (child.type !== 'element') continue
     const attrs = child.attrs ?? {}
     const id = attrs['id']
-    if (id) ids.add(id)
+    if (id) {
+      ids.add(id)
+      if (!idPositions.has(id)) idPositions.set(id, idPositions.size + 1)
+    }
     addRefs(child, parent, attrs, refs)
     if (child.name === 'style') {
       inlineStyles.push({ context: 'stylesheet', text: textContent(child), loc: child.loc })
@@ -137,7 +143,7 @@ function collect(
     if (styleAttr) {
       inlineStyles.push({ context: 'declarationList', text: styleAttr, loc: child.loc })
     }
-    collect(child, child.name, refs, ids, inlineStyles)
+    collect(child, child.name, refs, ids, idPositions, inlineStyles)
   }
 }
 
@@ -160,7 +166,8 @@ export function parseContent(
 
   const refs: ContentRef[] = []
   const ids = new Set<string>()
+  const idPositions = new Map<string, number>()
   const inlineStyles: InlineStyle[] = []
-  collect(root, undefined, refs, ids, inlineStyles)
-  return { doc: { path, root, refs, ids, inlineStyles }, messages }
+  collect(root, undefined, refs, ids, idPositions, inlineStyles)
+  return { doc: { path, root, refs, ids, idPositions, inlineStyles }, messages }
 }
