@@ -3,7 +3,7 @@ import { getResource, type EpubContainer } from '../io/zip.js'
 import { resolvePath, isRemote, hasScheme } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
 import { manifestPathMap, type ManifestItem, type PackageDocument } from '../parse/opf.js'
-import type { XmlNode } from '../io/xml.js'
+import { findDescendants, type XmlNode } from '../io/xml.js'
 import { isKnownHtmlElement } from '../util/html-elements.js'
 import { analyzeCss } from '../parse/css.js'
 import { validateCss } from './css.js'
@@ -111,6 +111,7 @@ export function validateContentDocs(pkg: PackageDocument, container: EpubContain
     messages.push(...checkReferences(doc, container, manifest, byId, spinePaths))
     messages.push(...checkFragments(doc, docs, manifest))
     messages.push(...checkElements(doc))
+    messages.push(...checkLinkElements(doc))
     for (const style of doc.inlineStyles) {
       const a = analyzeCss(style.text, doc.path, style.context)
       messages.push(...a.messages)
@@ -174,6 +175,28 @@ function checkElements(doc: ContentDocument): Message[] {
     }
   }
   walk(doc.root)
+  return messages
+}
+
+// EPUB alternate-style-sheet vocabulary terms that conflict when both appear.
+const ALTCSS_CONFLICTS: ReadonlyArray<readonly [string, string]> = [
+  ['vertical', 'horizontal'],
+  ['day', 'night'],
+]
+
+function checkLinkElements(doc: ContentDocument): Message[] {
+  const messages: Message[] = []
+  for (const link of findDescendants(doc.root, 'link')) {
+    const attrs = link.attrs ?? {}
+    const rel = (attrs['rel'] ?? '').split(/\s+/).filter(Boolean)
+    if (rel.includes('alternate') && rel.includes('stylesheet') && (attrs['title'] ?? '').trim() === '') {
+      messages.push(msg('CSS-015', link.loc))
+    }
+    const classes = new Set((attrs['class'] ?? '').split(/\s+/).filter(Boolean))
+    if (ALTCSS_CONFLICTS.some(([a, b]) => classes.has(a) && classes.has(b))) {
+      messages.push(msg('CSS-005', link.loc, attrs['class'] ?? ''))
+    }
+  }
   return messages
 }
 

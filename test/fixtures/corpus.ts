@@ -360,6 +360,30 @@ export const CORPUS: Fixture[] = [
     expected: [E('CSS-006', 'USAGE')],
   },
   {
+    name: 'css-alternate-stylesheet-no-title',
+    area: 'css',
+    description: 'an alternate stylesheet <link> has no title (epubcheck CSS-015)',
+    epub: cssEpub('p { color: red; }', {
+      'EPUB/content_001.xhtml': CONTENT.replace(
+        '<head><title>t</title></head>',
+        '<head><title>t</title><link rel="stylesheet" href="style.css"/><link rel="alternate stylesheet" href="style.css"/></head>',
+      ),
+    }),
+    expected: [E('CSS-015', 'ERROR')],
+  },
+  {
+    name: 'css-link-conflicting-class',
+    area: 'css',
+    description: 'a stylesheet <link> has conflicting alternate-style class tokens (epubcheck CSS-005)',
+    epub: cssEpub('p { color: red; }', {
+      'EPUB/content_001.xhtml': CONTENT.replace(
+        '<head><title>t</title></head>',
+        '<head><title>t</title><link rel="stylesheet" href="style.css" class="day night"/></head>',
+      ),
+    }),
+    expected: [E('CSS-005', 'USAGE')],
+  },
+  {
     name: 'inline-style-element-url-missing',
     area: 'css',
     description: 'supplementary: <style> element url() target missing (RSC-007)',
