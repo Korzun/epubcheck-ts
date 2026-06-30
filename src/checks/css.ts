@@ -73,8 +73,8 @@ function checkReferences(
       messages.push(msg('RSC-008', ref.loc, url))
     } else if (ref.type === 'font') {
       const item = manifest.get(target)
-      if (item && !isBlessedFontType(item.mediaType)) {
-        messages.push(msg('CSS-007', ref.loc, url, item.mediaType ?? ''))
+      if (item && item.mediaType !== undefined && !isBlessedFontType(item.mediaType)) {
+        messages.push(msg('CSS-007', ref.loc, url, item.mediaType))
       }
     }
   }

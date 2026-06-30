@@ -187,6 +187,7 @@ const ALTCSS_CONFLICTS: ReadonlyArray<readonly [string, string]> = [
 function checkLinkElements(doc: ContentDocument): Message[] {
   const messages: Message[] = []
   for (const link of findDescendants(doc.root, 'link')) {
+    if (link.ns !== HTML_NS) continue
     const attrs = link.attrs ?? {}
     const rel = (attrs['rel'] ?? '').split(/\s+/).filter(Boolean)
     if (rel.includes('alternate') && rel.includes('stylesheet') && (attrs['title'] ?? '').trim() === '') {

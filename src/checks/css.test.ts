@@ -102,4 +102,12 @@ describe('validateCssDocs — font-face type (CSS-007)', () => {
     const out = ids('body { background: url(pic.bin); }', { present: ['pic.bin'], declared: ['pic.bin'] })
     expect(out).not.toContain('CSS-007')
   })
+
+  it('no CSS-007 when the @font-face src targets a manifest item with no media-type', () => {
+    const { pkg, container } = setup('@font-face { font-family: F; src: url(f.bin); }')
+    // Deliberately omit mediaType to simulate a manifest item declared with no media-type.
+    pkg.manifest.push({ id: 'fnt', href: 'f.bin', properties: [], loc: LOC })
+    container.resources.set('EPUB/f.bin', { path: 'EPUB/f.bin', bytes: enc('x'), compression: 'deflate' })
+    expect(validateCssDocs(pkg, container).map((m) => m.id)).not.toContain('CSS-007')
+  })
 })
