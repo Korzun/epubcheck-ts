@@ -332,6 +332,27 @@ export const CORPUS: Fixture[] = [
     expected: [E('RSC-031', 'WARNING')],
   },
   {
+    name: 'css-font-face-nonstandard-type',
+    area: 'css',
+    description: '@font-face src targets a resource whose manifest media-type is not a font type (epubcheck CSS-007)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace(
+          '</manifest>',
+          '<item id="css" href="style.css" media-type="text/css"/>' +
+            '<item id="fnt" href="f.bin" media-type="application/octet-stream"/></manifest>',
+        ),
+        'EPUB/content_001.xhtml': CONTENT.replace(
+          '<head><title>t</title></head>',
+          '<head><title>t</title><link rel="stylesheet" href="style.css"/></head>',
+        ),
+        'EPUB/style.css': '@font-face { font-family: F; src: url(f.bin); }',
+        'EPUB/f.bin': 'FONTBYTES',
+      },
+    }),
+    expected: [E('CSS-007', 'INFO')],
+  },
+  {
     name: 'css-position-fixed',
     area: 'css',
     description: 'supplementary: position:fixed (CSS-006, usage)',

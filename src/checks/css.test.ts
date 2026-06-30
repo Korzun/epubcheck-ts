@@ -84,3 +84,22 @@ describe('validateCss (reusable)', () => {
     expect(ids).toContain('CSS-006') // position: fixed
   })
 })
+
+describe('validateCssDocs — font-face type (CSS-007)', () => {
+  it('CSS-007 when a @font-face src targets a non-font media type', () => {
+    const out = ids('@font-face { font-family: F; src: url(f.bin); }', { present: ['f.bin'], declared: ['f.bin'] })
+    expect(out).toContain('CSS-007')
+  })
+
+  it('no CSS-007 when the @font-face src targets a blessed font type', () => {
+    const { pkg, container } = setup('@font-face { font-family: F; src: url(f.woff2); }')
+    pkg.manifest.push({ id: 'fnt', href: 'f.woff2', mediaType: 'font/woff2', properties: [], loc: LOC })
+    container.resources.set('EPUB/f.woff2', { path: 'EPUB/f.woff2', bytes: enc('x'), compression: 'deflate' })
+    expect(validateCssDocs(pkg, container).map((m) => m.id)).not.toContain('CSS-007')
+  })
+
+  it('no CSS-007 for a non-font url() (only @font-face src is checked)', () => {
+    const out = ids('body { background: url(pic.bin); }', { present: ['pic.bin'], declared: ['pic.bin'] })
+    expect(out).not.toContain('CSS-007')
+  })
+})

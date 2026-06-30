@@ -7,6 +7,7 @@ import type { XmlNode } from '../io/xml.js'
 import { isKnownHtmlElement } from '../util/html-elements.js'
 import { analyzeCss } from '../parse/css.js'
 import { validateCss } from './css.js'
+import { BLESSED_FONT_TYPES } from '../util/media-types.js'
 
 const REMOTE_ALLOWED: ReadonlySet<RefType> = new Set<RefType>(['hyperlink', 'cite', 'audio', 'video'])
 const HTML_NS = 'http://www.w3.org/1999/xhtml'
@@ -34,15 +35,8 @@ const CORE_MEDIA_TYPES: ReadonlySet<string> = new Set<string>([
   // audio
   'audio/mpeg',
   'audio/mp4',
-  // fonts
-  'font/ttf',
-  'font/otf',
-  'font/woff',
-  'font/woff2',
-  'application/font-sfnt',
-  'application/vnd.ms-opentype',
-  'application/font-woff',
-  'application/x-font-ttf',
+  // fonts (shared blessed-font set)
+  ...BLESSED_FONT_TYPES,
   // blessed content / script / style / other core types
   'application/xhtml+xml',
   'text/javascript',

@@ -3,6 +3,7 @@ import { manifestPathMap, type ManifestItem, type PackageDocument } from '../par
 import { getResource, type EpubContainer } from '../io/zip.js'
 import { resolvePath, isRemote, hasScheme } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
+import { isBlessedFontType } from '../util/media-types.js'
 
 export function validateCss(
   css: CssDocument,
@@ -70,6 +71,11 @@ function checkReferences(
       messages.push(msg('RSC-007', ref.loc, url))
     } else if (!manifest.has(target)) {
       messages.push(msg('RSC-008', ref.loc, url))
+    } else if (ref.type === 'font') {
+      const item = manifest.get(target)
+      if (item && !isBlessedFontType(item.mediaType)) {
+        messages.push(msg('CSS-007', ref.loc, url, item.mediaType ?? ''))
+      }
     }
   }
   return messages
