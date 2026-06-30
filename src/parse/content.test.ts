@@ -93,3 +93,19 @@ describe('parseContent — intrinsic fallback', () => {
     expect(refFor('<iframe src="y.xhtml"></iframe>', 'y.xhtml')?.hasIntrinsicFallback).toBe(false)
   })
 })
+
+describe('parseContent — id positions', () => {
+  it('records 1-based id positions in document order', () => {
+    const { doc } = parseContent(item, container(DOC('<h2 id="a">A</h2><p id="b">B</p><h2 id="c">C</h2>')))
+    expect(doc!.idPositions.get('a')).toBe(1)
+    expect(doc!.idPositions.get('b')).toBe(2)
+    expect(doc!.idPositions.get('c')).toBe(3)
+    expect(doc!.idPositions.get('missing')).toBeUndefined()
+  })
+
+  it('keeps the first occurrence for duplicate ids', () => {
+    const { doc } = parseContent(item, container(DOC('<p id="x">1</p><p id="y">2</p><p id="x">3</p>')))
+    expect(doc!.idPositions.get('x')).toBe(1)
+    expect(doc!.idPositions.get('y')).toBe(2)
+  })
+})
