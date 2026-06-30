@@ -332,11 +332,82 @@ export const CORPUS: Fixture[] = [
     expected: [E('RSC-031', 'WARNING')],
   },
   {
+    name: 'css-font-face-nonstandard-type',
+    area: 'css',
+    description: '@font-face src targets a resource whose manifest media-type is not a font type (epubcheck CSS-007)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace(
+          '</manifest>',
+          '<item id="css" href="style.css" media-type="text/css"/>' +
+            '<item id="fnt" href="f.bin" media-type="application/octet-stream"/></manifest>',
+        ),
+        'EPUB/content_001.xhtml': CONTENT.replace(
+          '<head><title>t</title></head>',
+          '<head><title>t</title><link rel="stylesheet" href="style.css"/></head>',
+        ),
+        'EPUB/style.css': '@font-face { font-family: F; src: url(f.bin); }',
+        'EPUB/f.bin': 'FONTBYTES',
+      },
+    }),
+    expected: [E('CSS-007', 'INFO')],
+  },
+  {
     name: 'css-position-fixed',
     area: 'css',
     description: 'supplementary: position:fixed (CSS-006, usage)',
     epub: cssEpub('div { position: fixed; }'),
     expected: [E('CSS-006', 'USAGE')],
+  },
+  {
+    name: 'css-alternate-stylesheet-no-title',
+    area: 'css',
+    description: 'an alternate stylesheet <link> has no title (epubcheck CSS-015)',
+    epub: cssEpub('p { color: red; }', {
+      'EPUB/content_001.xhtml': CONTENT.replace(
+        '<head><title>t</title></head>',
+        '<head><title>t</title><link rel="stylesheet" href="style.css"/><link rel="alternate stylesheet" href="style.css"/></head>',
+      ),
+    }),
+    expected: [E('CSS-015', 'ERROR')],
+  },
+  {
+    name: 'css-link-conflicting-class',
+    area: 'css',
+    description: 'a stylesheet <link> has conflicting alternate-style class tokens (epubcheck CSS-005)',
+    epub: cssEpub('p { color: red; }', {
+      'EPUB/content_001.xhtml': CONTENT.replace(
+        '<head><title>t</title></head>',
+        '<head><title>t</title><link rel="stylesheet" href="style.css" class="day night"/></head>',
+      ),
+    }),
+    expected: [E('CSS-005', 'USAGE')],
+  },
+  {
+    name: 'css-charset-non-utf8',
+    area: 'css',
+    description: 'CSS @charset declares a non-UTF-8 encoding (epubcheck CSS-004)',
+    epub: cssEpub('@charset "iso-8859-1";\np { color: red; }'),
+    expected: [E('CSS-004', 'ERROR')],
+  },
+  {
+    name: 'css-encoding-utf16',
+    area: 'css',
+    description: 'CSS file is UTF-16 (BOM) and should be UTF-8 (epubcheck CSS-003)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace(
+          '</manifest>',
+          '<item id="css" href="style.css" media-type="text/css"/></manifest>',
+        ),
+        'EPUB/content_001.xhtml': CONTENT.replace(
+          '<head><title>t</title></head>',
+          '<head><title>t</title><link rel="stylesheet" href="style.css"/></head>',
+        ),
+        'EPUB/style.css': new Uint8Array([0xff, 0xfe, 0x70, 0x00, 0x7b, 0x00, 0x7d, 0x00]), // UTF-16LE BOM + "p{}"
+      },
+    }),
+    expected: [E('CSS-003', 'WARNING')],
   },
   {
     name: 'inline-style-element-url-missing',

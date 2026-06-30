@@ -74,6 +74,14 @@ describe('CATALOG', () => {
     expect(CATALOG['RSC-031']?.severity).toBe('WARNING')
   })
 
+  it('defines the CSS-completeness message ids', () => {
+    expect(CATALOG['CSS-003']).toEqual({ severity: 'WARNING', template: 'CSS document is encoded in UTF-16. It should be encoded in UTF-8 instead.' })
+    expect(CATALOG['CSS-004']).toEqual({ severity: 'ERROR', template: 'CSS documents must be encoded in UTF-8, detected %1$s;' })
+    expect(CATALOG['CSS-005']).toEqual({ severity: 'USAGE', template: 'Conflicting alternate style tags found: %1$s.' })
+    expect(CATALOG['CSS-007']).toEqual({ severity: 'INFO', template: 'Font-face reference "%1$s" refers to non-standard font type "%2$s".' })
+    expect(CATALOG['CSS-015']).toEqual({ severity: 'ERROR', template: 'Alternative style sheets must have a title.' })
+  })
+
   it('defines manifest-completeness message ids', () => {
     expect(CATALOG['OPF-003']?.severity).toBe('USAGE')
     expect(CATALOG['PKG-001']?.severity).toBe('WARNING')

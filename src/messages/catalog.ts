@@ -39,8 +39,13 @@ export const CATALOG: Record<string, { severity: Severity; template: string }> =
   // CSS
   'CSS-001': { severity: 'ERROR', template: 'The "%1$s" property must not be included in an EPUB Style Sheet.' },
   'CSS-002': { severity: 'ERROR', template: 'Empty or NULL reference found.' },
+  'CSS-003': { severity: 'WARNING', template: 'CSS document is encoded in UTF-16. It should be encoded in UTF-8 instead.' },
+  'CSS-004': { severity: 'ERROR', template: 'CSS documents must be encoded in UTF-8, detected %1$s;' },
+  'CSS-005': { severity: 'USAGE', template: 'Conflicting alternate style tags found: %1$s.' },
   'CSS-006': { severity: 'USAGE', template: 'CSS selector specifies fixed position.' },
+  'CSS-007': { severity: 'INFO', template: 'Font-face reference "%1$s" refers to non-standard font type "%2$s".' },
   'CSS-008': { severity: 'ERROR', template: 'An error occurred while parsing the CSS: %1$s.' },
+  'CSS-015': { severity: 'ERROR', template: 'Alternative style sheets must have a title.' },
   'CSS-019': { severity: 'WARNING', template: 'CSS font-face declaration has no attributes.' },
   'RSC-013': { severity: 'ERROR', template: 'Fragment identifier is used in a reference to a stylesheet resource.' },
   'RSC-030': { severity: 'ERROR', template: 'File URLs are not allowed in EPUB, but found "%1$s".' },

@@ -9,7 +9,7 @@ export const IMPLEMENTED_IDS: ReadonlySet<string> = new Set([
   // navigation
   'NAV-010', 'NAV-011',
   // css
-  'CSS-001', 'CSS-002', 'CSS-006', 'CSS-008', 'CSS-019',
+  'CSS-001', 'CSS-002', 'CSS-003', 'CSS-004', 'CSS-005', 'CSS-006', 'CSS-007', 'CSS-008', 'CSS-015', 'CSS-019',
   // internal
   'CHK-001',
 ])

@@ -212,3 +212,26 @@ describe('validateContentDocs — foreign-resource fallback', () => {
     expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-032')
   })
 })
+
+describe('validateContentDocs — link elements (CSS-005/015)', () => {
+  it('CSS-015 when an alternate stylesheet link has no title', () => {
+    expect(ids({ 'c1.xhtml': '<link rel="alternate stylesheet" href="alt.css"/>' })).toContain('CSS-015')
+  })
+
+  it('no CSS-015 when the alternate stylesheet link has a title', () => {
+    expect(ids({ 'c1.xhtml': '<link rel="alternate stylesheet" href="alt.css" title="Night"/>' })).not.toContain('CSS-015')
+  })
+
+  it('no CSS-015 for an ordinary (non-alternate) stylesheet link', () => {
+    expect(ids({ 'c1.xhtml': '<link rel="stylesheet" href="s.css"/>' })).not.toContain('CSS-015')
+  })
+
+  it('CSS-005 when a link class has conflicting alternate-style vocabulary', () => {
+    expect(ids({ 'c1.xhtml': '<link rel="stylesheet" href="s.css" class="vertical horizontal"/>' })).toContain('CSS-005')
+    expect(ids({ 'c1.xhtml': '<link rel="stylesheet" href="s.css" class="day night"/>' })).toContain('CSS-005')
+  })
+
+  it('no CSS-005 for non-conflicting link classes', () => {
+    expect(ids({ 'c1.xhtml': '<link rel="stylesheet" href="s.css" class="vertical day"/>' })).not.toContain('CSS-005')
+  })
+})

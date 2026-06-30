@@ -138,6 +138,25 @@ export function analyzeCss(
   return { parsed: true, refs, declarations, fontFaces, messages }
 }
 
+/**
+ * Detect a CSS file's declared encoding from a leading BOM or an `@charset`
+ * rule (which, per the CSS syntax, must be the very first bytes). Returns the
+ * lowercased encoding name, or undefined when none is declared (assume UTF-8).
+ */
+function detectCssCharset(bytes: Uint8Array): string | undefined {
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) return 'utf-16be'
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return 'utf-16le'
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return 'utf-8' // UTF-8 BOM
+  const prefix = '@charset "'
+  let head = ''
+  for (let i = 0; i < Math.min(bytes.length, 100); i++) head += String.fromCharCode(bytes[i] ?? 0)
+  if (head.startsWith(prefix)) {
+    const end = head.indexOf('"', prefix.length)
+    if (end > prefix.length) return head.slice(prefix.length, end).toLowerCase()
+  }
+  return undefined
+}
+
 export function parseCss(
   item: ManifestItem,
   container: EpubContainer,
@@ -148,6 +167,16 @@ export function parseCss(
   const path = resolvePath(opfPath, item.href)
   const resource = getResource(container, path)
   if (!resource) return { messages: [] } // missing file is reported as RSC-001 by the OPF manifest check
+
+  const charset = detectCssCharset(resource.bytes)
+  if (charset !== undefined && charset !== 'utf-8') {
+    // Non-UTF-8 CSS: report the encoding rule and skip parsing (decoding as
+    // UTF-8 would produce mojibake and spurious CSS-008 errors).
+    const message = charset.startsWith('utf-16')
+      ? msg('CSS-003', { path })
+      : msg('CSS-004', { path }, charset)
+    return { messages: [message] }
+  }
 
   const text = new TextDecoder('utf-8').decode(resource.bytes)
   const a = analyzeCss(text, path, 'stylesheet')
