@@ -16,6 +16,8 @@ edge runtimes).
 - **Runtime-agnostic** — pure functions over byte buffers; no filesystem access.
 - **Layered, functional API** — call the all-in-one `validateEpub`, or compose
   the underlying parse/check functions yourself.
+- **Dual ESM + CJS** — ships both `import` and `require` builds, each with its
+  own type declarations.
 - **epubcheck-compatible messages** — message ids (`OPF-014`, `RSC-005`,
   `NAV-010`, …) and English templates match epubcheck's catalog.
 - **Few, lightweight runtime deps** — only `fflate` (zip), `saxes` (XML), and
@@ -61,6 +63,12 @@ if (report.valid) {
     console.log(`${m.severity} ${m.id} ${where} — ${m.message}`)
   }
 }
+```
+
+The package is published as both ESM and CommonJS, so `require` works too:
+
+```js
+const { validateEpub } = require('epubcheck-ts')
 ```
 
 ### Options
