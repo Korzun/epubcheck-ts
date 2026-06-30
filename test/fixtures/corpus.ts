@@ -189,6 +189,46 @@ export const CORPUS: Fixture[] = [
     expected: [E('NAV-011', 'WARNING')],
   },
   {
+    name: 'nav-reading-order-fragments',
+    area: 'nav',
+    description: 'toc links to fragments of the same spine item are out of document order (epubcheck NAV-011 x2)',
+    epub: buildEpub({
+      files: {
+        'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<h2 id="ch1">1</h2><h2 id="ch2">2</h2><h2 id="ch3">3</h2>'),
+        'EPUB/nav.xhtml': NAV.replace(
+          '<nav epub:type="toc"><ol><li><a href="content_001.xhtml">Content</a></li></ol></nav>',
+          '<nav epub:type="toc"><ol>' +
+            '<li><a href="content_001.xhtml#ch1">1</a></li>' +
+            '<li><a href="content_001.xhtml">M</a></li>' +
+            '<li><a href="content_001.xhtml#ch3">3</a></li>' +
+            '<li><a href="content_001.xhtml#ch2">2</a></li>' +
+            '</ol></nav>',
+        ),
+      },
+    }),
+    expected: [E('NAV-011', 'WARNING'), E('NAV-011', 'WARNING')],
+  },
+  {
+    name: 'nav-reading-order-fragments-valid',
+    area: 'nav',
+    description: 'toc links to fragments of the same spine item in correct document order (valid; no NAV-011)',
+    epub: buildEpub({
+      files: {
+        'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<h2 id="ch1">1</h2><h2 id="ch2">2</h2><h2 id="ch3">3</h2>'),
+        'EPUB/nav.xhtml': NAV.replace(
+          '<nav epub:type="toc"><ol><li><a href="content_001.xhtml">Content</a></li></ol></nav>',
+          '<nav epub:type="toc"><ol>' +
+            '<li><a href="content_001.xhtml">M</a></li>' +
+            '<li><a href="content_001.xhtml#ch1">1</a></li>' +
+            '<li><a href="content_001.xhtml#ch2">2</a></li>' +
+            '<li><a href="content_001.xhtml#ch3">3</a></li>' +
+            '</ol></nav>',
+        ),
+      },
+    }),
+    expected: [],
+  },
+  {
     name: 'nav-link-missing-target',
     area: 'nav',
     description: 'nav toc link points to a missing file (epubcheck RSC-007, via content validation of the nav doc)',
@@ -201,6 +241,32 @@ export const CORPUS: Fixture[] = [
     description: 'nav toc link has an undefined fragment in its target (epubcheck RSC-012, via content validation of the nav doc)',
     epub: buildEpub({ files: { 'EPUB/nav.xhtml': NAV.replace('href="content_001.xhtml"', 'href="content_001.xhtml#nope"') } }),
     expected: [E('RSC-012', 'ERROR')],
+  },
+  {
+    name: 'nav-link-noncontent-type',
+    area: 'nav',
+    description: 'nav toc link targets a non-content-document resource type (epubcheck RSC-010, via nav-as-content)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace('</manifest>', '<item id="photo" href="photo.jpg" media-type="image/jpeg"/></manifest>'),
+        'EPUB/photo.jpg': 'JPEG',
+        'EPUB/nav.xhtml': NAV.replace('href="content_001.xhtml"', 'href="photo.jpg"'),
+      },
+    }),
+    expected: [E('RSC-010', 'ERROR')],
+  },
+  {
+    name: 'nav-link-nonspine',
+    area: 'nav',
+    description: 'nav toc link targets a content doc not in the spine (epubcheck RSC-011, via nav-as-content)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace('</manifest>', '<item id="extra" href="extra.xhtml" media-type="application/xhtml+xml"/></manifest>'),
+        'EPUB/extra.xhtml': CONTENT,
+        'EPUB/nav.xhtml': NAV.replace('href="content_001.xhtml"', 'href="extra.xhtml"'),
+      },
+    }),
+    expected: [E('RSC-011', 'ERROR')],
   },
 
   // ---- Content references (mirrors epub3/06-content-document) ----
@@ -264,6 +330,56 @@ export const CORPUS: Fixture[] = [
       },
     }),
     expected: [E('RSC-032', 'ERROR')],
+  },
+  // content — RSC-032 variations + valid fallback
+  {
+    name: 'content-foreign-audio-no-fallback',
+    area: 'content',
+    description: 'content audio@src targets a non-core media type with no fallback (epubcheck RSC-032)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace('</manifest>', '<item id="snd" href="sound.bin" media-type="application/octet-stream"/></manifest>'),
+        'EPUB/sound.bin': 'AUDIO',
+        'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><audio src="sound.bin"></audio></p>'),
+      },
+    }),
+    expected: [E('RSC-032', 'ERROR')],
+  },
+  {
+    name: 'content-foreign-embed-no-fallback',
+    area: 'content',
+    description: 'content embed@src targets a non-core media type with no fallback (epubcheck RSC-032)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace('</manifest>', '<item id="emb" href="thing.bin" media-type="application/octet-stream"/></manifest>'),
+        'EPUB/thing.bin': 'DATA',
+        'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><embed src="thing.bin"/></p>'),
+      },
+    }),
+    expected: [E('RSC-032', 'ERROR')],
+  },
+  {
+    name: 'content-foreign-img-with-fallback-valid',
+    area: 'content',
+    description: 'content img@src targets a non-core type but has a manifest fallback to a core type (valid; no RSC-032)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace('</manifest>',
+          '<item id="tiff" href="diagram.tiff" media-type="image/tiff" fallback="png"/>' +
+          '<item id="png" href="diagram.png" media-type="image/png"/></manifest>'),
+        'EPUB/diagram.tiff': 'TIFF',
+        'EPUB/diagram.png': 'PNG',
+        'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><img src="diagram.tiff"/></p>'),
+      },
+    }),
+    expected: [],
+  },
+  {
+    name: 'content-video-remote-http',
+    area: 'content',
+    description: 'content video@src is a remote HTTP url that should be HTTPS (epubcheck RSC-031)',
+    epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p><video src="http://example.com/v.mp4"></video></p>') } }),
+    expected: [E('RSC-031', 'WARNING')],
   },
 
   // ---- CSS (mirrors epub3/06-content-document css scenarios) ----
@@ -370,6 +486,34 @@ export const CORPUS: Fixture[] = [
       ),
     }),
     expected: [E('CSS-015', 'ERROR')],
+  },
+  {
+    name: 'css-alternate-stylesheet-empty-title',
+    area: 'css',
+    description: 'an alternate stylesheet <link> has an empty title attribute (epubcheck CSS-015)',
+    epub: cssEpub('p { color: red; }', {
+      'EPUB/content_001.xhtml': CONTENT.replace(
+        '<head><title>t</title></head>',
+        '<head><title>t</title><link rel="stylesheet" href="style.css"/><link rel="alternate stylesheet" href="style.css" title=""/></head>',
+      ),
+    }),
+    expected: [E('CSS-015', 'ERROR')],
+  },
+  {
+    name: 'css-font-face-valid',
+    area: 'css',
+    description: '@font-face src targets a blessed font type (valid; no CSS-007)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace('</manifest>',
+          '<item id="css" href="style.css" media-type="text/css"/>' +
+          '<item id="fnt" href="f.woff2" media-type="font/woff2"/></manifest>'),
+        'EPUB/content_001.xhtml': CONTENT.replace('<head><title>t</title></head>', '<head><title>t</title><link rel="stylesheet" href="style.css"/></head>'),
+        'EPUB/style.css': '@font-face { font-family: F; src: url(f.woff2); }',
+        'EPUB/f.woff2': 'WOFF2',
+      },
+    }),
+    expected: [],
   },
   {
     name: 'css-link-conflicting-class',
