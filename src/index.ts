@@ -1,4 +1,4 @@
-export const VERSION = '0.0.0'
+export const VERSION = '0.1.0-beta.0'
 
 // Primary + layered API
 export { validateEpub, type ValidateOptions } from './validate.js'
