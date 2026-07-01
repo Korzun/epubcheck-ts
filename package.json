@@ -4,6 +4,14 @@
   "description": "A TypeScript-native EPUB validator (library).",
   "type": "module",
   "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Korzun/epubcheck-ts.git"
+  },
+  "homepage": "https://github.com/Korzun/epubcheck-ts#readme",
+  "bugs": {
+    "url": "https://github.com/Korzun/epubcheck-ts/issues"
+  },
   "publishConfig": {
     "access": "public"
   },
