@@ -22,18 +22,8 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
-
-      - run: npm ci
-
-      # Gate the publish on the same checks CI runs, then build dist/.
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      # Same install/lint/typecheck/test/build as CI; leaves dist/ ready to publish.
+      - uses: ./.github/actions/build
 
       - name: Verify release tag matches package.json version
         run: |

@@ -1,0 +1,27 @@
+name: Install, verify, and build
+description: Install dependencies, run lint/typecheck/test, and build the package.
+
+inputs:
+  node-version:
+    description: Node.js version to use.
+    required: false
+    default: '22'
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        registry-url: 'https://registry.npmjs.org'
+        cache: 'npm'
+    - run: npm ci
+      shell: bash
+    - run: npm run lint
+      shell: bash
+    - run: npm run typecheck
+      shell: bash
+    - run: npm test
+      shell: bash
+    - run: npm run build
+      shell: bash
