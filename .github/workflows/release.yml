@@ -35,13 +35,13 @@ jobs:
             exit 1
           fi
 
-      # A GitHub release marked as "pre-release" publishes under the `next`
+      # A GitHub release marked as "pre-release" publishes under the `beta`
       # dist-tag so it never becomes the default `latest` install.
       - name: Determine dist-tag
         id: disttag
         run: |
           if [ "${{ github.event.release.prerelease }}" = "true" ]; then
-            echo "tag=next" >> "$GITHUB_OUTPUT"
+            echo "tag=beta" >> "$GITHUB_OUTPUT"
           else
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
