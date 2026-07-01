@@ -1,4 +1,8 @@
-export const VERSION = '0.0.0'
+// Single source of truth: the bundler inlines this at build time, so there is
+// no runtime file access and the value can never drift from package.json.
+import { version } from '../package.json'
+
+export const VERSION: string = version
 
 // Primary + layered API
 export { validateEpub, type ValidateOptions } from './validate.js'
