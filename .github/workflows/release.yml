@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+# Trusted Publishing: npm verifies this workflow via OIDC (no NPM_TOKEN) and
+# attaches build provenance automatically.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      # Gate the publish on the same checks CI runs, then build dist/.
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - name: Verify release tag matches package.json version
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          tag="${tag#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Release tag '$tag' does not match package.json version '$pkg'."
+            exit 1
+          fi
+
+      # A GitHub release marked as "pre-release" publishes under the `next`
+      # dist-tag so it never becomes the default `latest` install.
+      - name: Determine dist-tag
+        id: disttag
+        run: |
+          if [ "${{ github.event.release.prerelease }}" = "true" ]; then
+            echo "tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      # npm >= 11.5.1 is required for OIDC Trusted Publishing.
+      - run: npm install -g npm@latest
+
+      - run: npm publish --provenance --tag ${{ steps.disttag.outputs.tag }}

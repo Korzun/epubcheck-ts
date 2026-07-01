@@ -163,6 +163,26 @@ npm run build     # bundle to dist/ via tsdown
 Unit tests are colocated with their source (`src/**/*.test.ts`); integration
 tests and fixtures live under `test/`.
 
+## Releasing
+
+Publishing is automated by
+[`.github/workflows/release.yml`](./.github/workflows/release.yml) and triggered
+by **publishing a GitHub Release**:
+
+1. Bump `version` in `package.json` and commit it to `main`.
+2. Create a GitHub Release whose tag matches that version, prefixed with `v`
+   (e.g. version `1.2.0` → tag `v1.2.0`). The workflow fails the publish if the
+   tag and `package.json` version disagree.
+3. Tick **"Set as a pre-release"** for beta/rc builds. Pre-releases publish
+   under the `next` dist-tag (`npm install @korzun/epubcheck-ts@next`); stable
+   releases publish under `latest`.
+
+Authentication uses npm [Trusted Publishing](https://docs.npmjs.com/trusted-publishers)
+(OIDC) — there is no `NPM_TOKEN` secret, and build provenance is attached
+automatically. This requires a one-time setup on npmjs.com: configure this
+repository and the `Release` workflow as a trusted publisher for the
+`@korzun/epubcheck-ts` package.
+
 ## License & attribution
 
 epubcheck-ts is licensed under the [BSD 3-Clause License](./LICENSE).
