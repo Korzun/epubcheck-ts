@@ -38,7 +38,7 @@ describe('integration: OPF validation', () => {
     const report = await validateEpub(epub(VALID_OPF, { 'EPUB/nav.xhtml': VALID_NAV }))
     const opfIds = report.messages.map((m) => m.id).filter((id) => id.startsWith('OPF') || id === 'RSC-001' || id === 'RSC-005')
     expect(opfIds).toEqual([])
-    expect(report.epubVersion).toBe('3.0')
+    expect(report.epubVersion).toBe('3.3') // default target for an unspecified EPUB 3 file
   })
 
   it('flags a manifest item whose file is missing', async () => {
