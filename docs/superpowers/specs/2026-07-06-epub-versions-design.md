@@ -48,17 +48,30 @@ and landmarks optional), and the `meta`/`property`/`scheme`/`refines` syntax.
 
 **Genuine, checkable revision deltas — the scope of this work:**
 
-| Feature | 2.0.1 | 3.0 / 3.0.1 | 3.2 | 3.3 |
-|---|---|---|---|---|
-| `<bindings>` (OPF) | n/a | active | deprecated | deprecated |
-| `epub:switch` (content) | n/a | active | deprecated | deprecated |
-| `epub:trigger` (content) | n/a | active | deprecated | deprecated |
-| `<guide>` (OPF) | allowed | deprecated | legacy | legacy |
-| NCX + spine `toc` attr | **required** | optional (superseded) | legacy | legacy |
-| Core Media Types | 2.0 set | base 3.0 set | +WOFF2, +SFNT, +`application/javascript` | +WebP, +Opus, +`application/ecmascript`, −PLS |
+| Feature | 2.0.1 | 3.0 / 3.0.1 | 3.2 | 3.3 | We flag? |
+|---|---|---|---|---|---|
+| `<bindings>` (OPF) | n/a | active | deprecated | deprecated | yes (3.2+) |
+| `epub:switch` (content) | n/a | active | deprecated | deprecated | yes (3.2+) |
+| `epub:trigger` (content) | n/a | active | deprecated | deprecated | yes (3.2+) |
+| `<guide>` (OPF) | allowed | deprecated | legacy | legacy | **no** |
+| NCX + spine `toc` attr | required | optional (superseded) | legacy | legacy | **no** |
+| Core Media Types | 2.0 set | base 3.0 set | +WOFF2, +SFNT, +`application/javascript` | +WebP, +Opus, +`application/ecmascript`, −PLS | yes |
+
+**Fidelity note (why guide/NCX are not flagged):** the reference epubcheck emits
+*no* deprecation or legacy warning for `<guide>` or for NCX / the spine `toc`
+attribute — it treats NCX as a valid EPUB-2 compatibility feature and only
+validates guide *references*. Since this project is a faithful port of
+epubcheck's message vocabulary, emitting warnings epubcheck never produces would
+be a divergence (and noise on otherwise-valid files). So the deprecation scope is
+`bindings` + `epub:switch` + `epub:trigger` only. These three are reported by
+epubcheck through the generic **`RSC-017` (WARNING)** message with
+feature-specific wording as the parameter; we additionally gate them to
+`atLeast(v,'3.2')`, which is *more* revision-accurate than epubcheck (which does
+not maintain a per-revision distinction and warns for all EPUB 3).
 
 The `switch` **manifest-property token** has a quirk worth noting: present in
-3.0/3.0.1, absent in 3.2 (6-token vocab), re-added as deprecated in 3.3.
+3.0/3.0.1, absent in 3.2 (6-token vocab), re-added as deprecated in 3.3. We do
+not validate the manifest property vocabulary today, so this is informational.
 
 ## Architecture (Approach B: central revision module + threaded target)
 
@@ -129,36 +142,38 @@ Replaces the current inline `detectedVersion` logic:
 
 Capture the signals the deprecation checks need. Add to `PackageDocument`:
 
-- `guide?: Location` — presence + location of `<guide>`
-- `bindings?: Location` — presence + location of `<bindings>`
-- `spineTocIdref?: string` (+ location) — the spine `toc` attribute (NCX ref)
+- `bindings?: Location` — presence + location of the `<bindings>` element
 
 In `parse/content.ts`, capture `epub:switch` / `epub:trigger` occurrences (with
-locations) on the `ContentDocument` so the content check can flag them.
+locations) on the `ContentDocument` so the content check can flag them. Both are
+elements in the OPS namespace (`http://www.idpf.org/2007/ops`), matched by local
+name (`switch` / `trigger`) plus namespace.
+
+(No `guide` or spine-`toc` capture — those are not flagged; see the fidelity
+note above.)
 
 ### 4. Check changes
 
 Thread the resolved `EpubVersion` into checks that branch on it:
 
-- `validateOpf(pkg, container, version)` — new deprecation/legacy checks, each
-  gated by `atLeast`:
-  - `bindings` present + `atLeast(v,'3.2')` → deprecated
-  - `guide` present + EPUB 3 → legacy/deprecated
-  - `spineTocIdref` present + `atLeast(v,'3.2')` → NCX legacy; still valid (and
-    conventionally expected) for EPUB 2
-- `validateContentDocs(pkg, container, version)` — replace the flat
+- `validateOpf(pkg, container, version)` — flag `bindings` present +
+  `atLeast(v,'3.2')` → `RSC-017` (WARNING), message parameter
+  `"Use of the bindings element is deprecated"`.
+- `validateContentDocs(pkg, container, version)` — (a) replace the flat
   `CORE_MEDIA_TYPES` set with `coreMediaTypes(version)`, making RSC-032
-  foreign-resource fallback logic revision-correct. Also flag `epub:switch` /
-  `epub:trigger` when `atLeast(v,'3.2')`.
+  foreign-resource fallback logic revision-correct; (b) flag `epub:switch` /
+  `epub:trigger` when `atLeast(v,'3.2')` → `RSC-017` (WARNING), parameters
+  `'The "epub:switch" element is deprecated.'` /
+  `'The "epub:trigger" element is deprecated.'`.
 - The EPUB-3-only gate in `validate.ts` flips from `detectedVersion === '3.0'`
   to `majorVersion(target) === '3.0'`.
 
 ### 5. Message catalog (`src/messages/catalog.ts`)
 
-Add entries for the new deprecation/legacy checks, **reusing epubcheck's actual
-message IDs and severities** (mostly WARNING, some USAGE). The exact IDs are
-pinned against epubcheck's message bundle during implementation rather than
-invented here.
+Add one entry — `RSC-017` (WARNING), template
+`Warning while parsing file: %1$s` — which is exactly how epubcheck surfaces the
+three deprecation warnings (generic ID, feature-specific wording passed as the
+parameter). No other new IDs are needed.
 
 ### 6. API surface (`src/index.ts`, `README.md`)
 
@@ -185,14 +200,13 @@ Colocated unit tests beside source; integration fixtures under `test/`.
   `coreMediaTypes(v)` asserted against the research matrix: WOFF2 absent in 3.0 /
   present in 3.2; WebP absent in 3.2 / present in 3.3; PLS present in 3.2 /
   removed in 3.3.
-- **`src/checks/opf.test.ts`** — `bindings` and NCX-`toc` warn at 3.2+ but not
-  3.0; `guide` warns in EPUB 3; NCX absence is fine in EPUB 3 and the check does
-  not misfire for EPUB 2.
+- **`src/checks/opf.test.ts`** — `bindings` present warns (`RSC-017`) at 3.2+ but
+  not at 3.0.
 - **`src/checks/content.test.ts`** — revision-sensitive RSC-032: a WebP resource
   with no fallback → RSC-032 under target `3.2`, clean under `3.3`;
-  `epub:switch`/`epub:trigger` warn at 3.2+.
-- **`src/parse/opf.test.ts` / `src/parse/content.test.ts`** — parser captures
-  `guide`/`bindings`/`spineTocIdref` and the `switch`/`trigger` signals.
+  `epub:switch`/`epub:trigger` warn (`RSC-017`) at 3.2+ but not at 3.0.
+- **`src/parse/opf.test.ts` / `src/parse/content.test.ts`** — parser captures the
+  `bindings` location and the `switch`/`trigger` signals.
 - **`src/validate.test.ts`** — target threading end-to-end: `{version:'3.3'}` on
   a `version="3.0"` file yields `epubVersion:'3.3'` and no PKG-001;
   `{version:'3.3'}` on a `version="2.0"` file fires PKG-001; default (no option)
@@ -206,6 +220,8 @@ Colocated unit tests beside source; integration fixtures under `test/`.
 - EPUB 3.4 (unpublished).
 - A 3.0-strict vs 3.0.1 distinction (no in-file signal; the one real delta,
   fixed-layout `rendition:*`, is not validated by this project today).
+- Deprecation/legacy warnings for `<guide>` and NCX / spine `toc` — the reference
+  epubcheck emits none, so neither do we (see the fidelity note above).
 - Accessibility-metadata conformance (a separate EPUB Accessibility spec; never
   a MUST for core EPUB conformance in any revision).
 - Fixed-layout `rendition:*` metadata validation.
