@@ -141,4 +141,18 @@ describe('validateEpub', () => {
     const report = await validateEpub(bytes, { version: '2.0' })
     expect(report.messages.some((m) => m.id === 'PKG-001' && m.severity === 'WARNING')).toBe(true)
   })
+
+  it('respects a NONE threshold — no rejection even on FATAL', async () => {
+    const report = await validateEpub(enc('not a zip'), { threshold: 'NONE' })
+    expect(report.fatal).toBe(true)
+    expect(report.valid).toBe(true)
+    expect(report.threshold).toBe('NONE')
+  })
+
+  it('rejects a FATAL under the default threshold (contrast with NONE)', async () => {
+    const report = await validateEpub(enc('not a zip'))
+    expect(report.fatal).toBe(true)
+    expect(report.valid).toBe(false)
+    expect(report.threshold).toBe('ERROR')
+  })
 })

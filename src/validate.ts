@@ -6,11 +6,12 @@ import { parseNav } from './parse/nav.js'
 import { validateNav } from './checks/nav.js'
 import { validateContentDocs } from './checks/content.js'
 import { validateCssDocs } from './checks/css.js'
-import { buildReport, type Report } from './report.js'
+import { buildReport, type Report, type ValidationThreshold } from './report.js'
 import { msg, type Message } from './messages/format.js'
 
 export interface ValidateOptions {
   version?: '2.0' | '3.0'
+  threshold?: ValidationThreshold
 }
 
 export async function validateEpub(
@@ -53,11 +54,11 @@ export async function validateEpub(
       }
     }
 
-    return buildReport(messages, options.version ?? detectedVersion)
+    return buildReport(messages, options.version ?? detectedVersion, options.threshold)
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
     const id = /zip/i.test(reason) ? 'PKG-003' : 'CHK-001'
     messages.push(msg(id, undefined, reason))
-    return buildReport(messages, options.version)
+    return buildReport(messages, options.version, options.threshold)
   }
 }

@@ -17,7 +17,8 @@ export { parseContent } from './parse/content.js'
 export { validateContentDocs } from './checks/content.js'
 export { parseCss, analyzeCss } from './parse/css.js'
 export { validateCss, validateCssDocs } from './checks/css.js'
-export { buildReport } from './report.js'
+// ValidationThreshold is both a value (runtime constants) and a type (union); separate type export would error
+export { buildReport, ValidationThreshold } from './report.js'
 export { msg } from './messages/format.js'
 
 // Types
