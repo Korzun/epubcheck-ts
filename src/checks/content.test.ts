@@ -6,7 +6,9 @@ import { validateContentDocs } from './content.js'
 const enc = (s: string) => new TextEncoder().encode(s)
 const LOC = { path: 'EPUB/package.opf', line: 1, column: 1 }
 const DOC = (body: string) =>
-  '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:xlink="http://www.w3.org/1999/xlink"><head><title>t</title></head><body>' +
+  '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:xlink="http://www.w3.org/1999/xlink" ' +
+  'xmlns:epub="http://www.idpf.org/2007/ops" xmlns:ev="http://www.w3.org/2001/xml-events">' +
+  '<head><title>t</title></head><body>' +
   body + '</body></html>'
 
 // Build a package + container from a map of content-doc bodies and extra resource paths.
@@ -32,7 +34,22 @@ function setup(docs: Record<string, string>, extras: string[] = []): { pkg: Pack
 }
 const ids = (docs: Record<string, string>, extras?: string[]) => {
   const { pkg, container } = setup(docs, extras)
-  return validateContentDocs(pkg, container).map((m) => m.id)
+  return validateContentDocs(pkg, container, '3.3').map((m) => m.id)
+}
+
+// An <img> pointing at a WebP manifest item, with no <picture> intrinsic fallback
+// and no manifest fallback — used to probe revision-sensitive RSC-032 gating.
+function setupWebp(): { pkg: PackageDocument; container: EpubContainer } {
+  const { pkg, container } = setup({ 'c1.xhtml': '<img src="pic.webp"/>' })
+  pkg.manifest.push({ id: 'webp', href: 'pic.webp', mediaType: 'image/webp', properties: [], loc: LOC })
+  container.resources.set('EPUB/pic.webp', { path: 'EPUB/pic.webp', bytes: enc('x'), compression: 'deflate' })
+  return { pkg, container }
+}
+
+// A single content doc whose body is the given fragment; DOC() already declares
+// xmlns:epub and xmlns:ev so epub:switch/epub:trigger parse cleanly.
+function setupBody(body: string): { pkg: PackageDocument; container: EpubContainer } {
+  return setup({ 'c1.xhtml': body })
 }
 
 describe('validateContentDocs — references', () => {
@@ -41,7 +58,7 @@ describe('validateContentDocs — references', () => {
     const pkg = setup({ 'c1.xhtml': '<a href="c2.xhtml">x</a><img src="a.png"/>', 'c2.xhtml': '<p>two</p>' })
     pkg.pkg.manifest.push({ id: 'img', href: 'a.png', mediaType: 'image/png', properties: [], loc: LOC })
     pkg.container.resources.set('EPUB/a.png', { path: 'EPUB/a.png', bytes: enc('x'), compression: 'deflate' })
-    expect(validateContentDocs(pkg.pkg, pkg.container).map((m) => m.id)).toEqual([])
+    expect(validateContentDocs(pkg.pkg, pkg.container, '3.3').map((m) => m.id)).toEqual([])
   })
   it('RSC-007 when a referenced file is missing', () => {
     expect(ids({ 'c1.xhtml': '<img src="missing.png"/>' })).toContain('RSC-007')
@@ -77,7 +94,7 @@ describe('validateContentDocs — fragments', () => {
 
 describe('validateContentDocs — elements', () => {
   it('RSC-005 for an unknown XHTML-namespace element', () => {
-    const msgs = (() => { const { pkg, container } = setup({ 'c1.xhtml': '<frobnicate>x</frobnicate>' }); return validateContentDocs(pkg, container) })()
+    const msgs = (() => { const { pkg, container } = setup({ 'c1.xhtml': '<frobnicate>x</frobnicate>' }); return validateContentDocs(pkg, container, '3.3') })()
     expect(msgs.some((m) => m.id === 'RSC-005' && m.message.includes('frobnicate'))).toBe(true)
   })
   it('does not flag known elements or custom (hyphenated) elements', () => {
@@ -105,7 +122,7 @@ describe('validateContentDocs — hyperlink targets', () => {
     const { pkg, container } = setup({ 'c1.xhtml': '<a href="photo.jpg">x</a>' })
     pkg.manifest.push({ id: 'photo', href: 'photo.jpg', mediaType: 'image/jpeg', properties: [], loc: LOC })
     container.resources.set('EPUB/photo.jpg', { path: 'EPUB/photo.jpg', bytes: enc('x'), compression: 'deflate' })
-    const out = validateContentDocs(pkg, container).map((m) => m.id)
+    const out = validateContentDocs(pkg, container, '3.3').map((m) => m.id)
     expect(out).toContain('RSC-010')
     expect(out).not.toContain('RSC-011')
   })
@@ -115,7 +132,7 @@ describe('validateContentDocs — hyperlink targets', () => {
     // c2 is a declared, present XHTML doc, but is intentionally NOT added to the spine.
     pkg.manifest.push({ id: 'c2', href: 'c2.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC })
     container.resources.set('EPUB/c2.xhtml', { path: 'EPUB/c2.xhtml', bytes: enc(DOC('<p>2</p>')), compression: 'deflate' })
-    const out = validateContentDocs(pkg, container).map((m) => m.id)
+    const out = validateContentDocs(pkg, container, '3.3').map((m) => m.id)
     expect(out).toContain('RSC-011')
     expect(out).not.toContain('RSC-010')
   })
@@ -123,7 +140,7 @@ describe('validateContentDocs — hyperlink targets', () => {
   it('no RSC-010/011 for a hyperlink to a spine content document', () => {
     // c1 and c2 are both content docs; setup() puts both in the spine.
     const { pkg, container } = setup({ 'c1.xhtml': '<a href="c2.xhtml">x</a>', 'c2.xhtml': '<p>2</p>' })
-    const out = validateContentDocs(pkg, container).map((m) => m.id)
+    const out = validateContentDocs(pkg, container, '3.3').map((m) => m.id)
     expect(out).not.toContain('RSC-010')
     expect(out).not.toContain('RSC-011')
   })
@@ -135,7 +152,7 @@ describe('validateContentDocs — hyperlink targets', () => {
     pkg.manifest.push({ id: 'fb', href: 'fb.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC })
     container.resources.set('EPUB/photo.jpg', { path: 'EPUB/photo.jpg', bytes: enc('x'), compression: 'deflate' })
     container.resources.set('EPUB/fb.xhtml', { path: 'EPUB/fb.xhtml', bytes: enc(DOC('<p>fb</p>')), compression: 'deflate' })
-    expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-010')
+    expect(validateContentDocs(pkg, container, '3.3').map((m) => m.id)).not.toContain('RSC-010')
   })
 
   it('RSC-011 (not RSC-010) for a hyperlink to a text/html doc not in the spine — text/html is deprecated-blessed', () => {
@@ -143,7 +160,7 @@ describe('validateContentDocs — hyperlink targets', () => {
     // c2 is a declared text/html doc (deprecated-blessed content type), present but NOT in the spine.
     pkg.manifest.push({ id: 'c2', href: 'c2.html', mediaType: 'text/html', properties: [], loc: LOC })
     container.resources.set('EPUB/c2.html', { path: 'EPUB/c2.html', bytes: enc('<html></html>'), compression: 'deflate' })
-    const out = validateContentDocs(pkg, container).map((m) => m.id)
+    const out = validateContentDocs(pkg, container, '3.3').map((m) => m.id)
     expect(out).toContain('RSC-011')
     expect(out).not.toContain('RSC-010')
   })
@@ -152,7 +169,7 @@ describe('validateContentDocs — hyperlink targets', () => {
     const { pkg, container } = setup({ 'c1.xhtml': '<a href="toc.ncx">x</a>' })
     pkg.manifest.push({ id: 'ncx', href: 'toc.ncx', mediaType: 'application/x-dtbncx+xml', properties: [], loc: LOC })
     container.resources.set('EPUB/toc.ncx', { path: 'EPUB/toc.ncx', bytes: enc('<ncx/>'), compression: 'deflate' })
-    const out = validateContentDocs(pkg, container).map((m) => m.id)
+    const out = validateContentDocs(pkg, container, '3.3').map((m) => m.id)
     expect(out).toContain('RSC-010')
     expect(out).not.toContain('RSC-011')
   })
@@ -179,14 +196,14 @@ describe('validateContentDocs — foreign-resource fallback', () => {
     const { pkg, container } = setup({ 'c1.xhtml': '<img src="diagram.tiff"/>' })
     pkg.manifest.push({ id: 'tiff', href: 'diagram.tiff', mediaType: 'image/tiff', properties: [], loc: LOC })
     container.resources.set('EPUB/diagram.tiff', { path: 'EPUB/diagram.tiff', bytes: enc('x'), compression: 'deflate' })
-    expect(validateContentDocs(pkg, container).map((m) => m.id)).toContain('RSC-032')
+    expect(validateContentDocs(pkg, container, '3.3').map((m) => m.id)).toContain('RSC-032')
   })
 
   it('no RSC-032 when the image target is a core media type', () => {
     const { pkg, container } = setup({ 'c1.xhtml': '<img src="ok.png"/>' })
     pkg.manifest.push({ id: 'png', href: 'ok.png', mediaType: 'image/png', properties: [], loc: LOC })
     container.resources.set('EPUB/ok.png', { path: 'EPUB/ok.png', bytes: enc('x'), compression: 'deflate' })
-    expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-032')
+    expect(validateContentDocs(pkg, container, '3.3').map((m) => m.id)).not.toContain('RSC-032')
   })
 
   it('no RSC-032 when the non-core target has a core-media-type fallback in the manifest', () => {
@@ -195,21 +212,21 @@ describe('validateContentDocs — foreign-resource fallback', () => {
     pkg.manifest.push({ id: 'png', href: 'ok.png', mediaType: 'image/png', properties: [], loc: LOC })
     container.resources.set('EPUB/diagram.tiff', { path: 'EPUB/diagram.tiff', bytes: enc('x'), compression: 'deflate' })
     container.resources.set('EPUB/ok.png', { path: 'EPUB/ok.png', bytes: enc('x'), compression: 'deflate' })
-    expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-032')
+    expect(validateContentDocs(pkg, container, '3.3').map((m) => m.id)).not.toContain('RSC-032')
   })
 
   it('no RSC-032 for a non-core image inside <picture> (intrinsic fallback)', () => {
     const { pkg, container } = setup({ 'c1.xhtml': '<picture><img src="diagram.tiff"/></picture>' })
     pkg.manifest.push({ id: 'tiff', href: 'diagram.tiff', mediaType: 'image/tiff', properties: [], loc: LOC })
     container.resources.set('EPUB/diagram.tiff', { path: 'EPUB/diagram.tiff', bytes: enc('x'), compression: 'deflate' })
-    expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-032')
+    expect(validateContentDocs(pkg, container, '3.3').map((m) => m.id)).not.toContain('RSC-032')
   })
 
   it('no RSC-032 for a video/* target (all video types are core media types)', () => {
     const { pkg, container } = setup({ 'c1.xhtml': '<video src="m.mkv"></video>' })
     pkg.manifest.push({ id: 'vid', href: 'm.mkv', mediaType: 'video/x-matroska', properties: [], loc: LOC })
     container.resources.set('EPUB/m.mkv', { path: 'EPUB/m.mkv', bytes: enc('x'), compression: 'deflate' })
-    expect(validateContentDocs(pkg, container).map((m) => m.id)).not.toContain('RSC-032')
+    expect(validateContentDocs(pkg, container, '3.3').map((m) => m.id)).not.toContain('RSC-032')
   })
 })
 
@@ -233,5 +250,26 @@ describe('validateContentDocs — link elements (CSS-005/015)', () => {
 
   it('no CSS-005 for non-conflicting link classes', () => {
     expect(ids({ 'c1.xhtml': '<link rel="stylesheet" href="s.css" class="vertical day"/>' })).not.toContain('CSS-005')
+  })
+})
+
+describe('validateContentDocs — revision-sensitive core media types', () => {
+  it('RSC-032 for a WebP image target under 3.2 (WebP not yet core)', () => {
+    const { pkg, container } = setupWebp()
+    expect(validateContentDocs(pkg, container, '3.2').map((m) => m.id)).toContain('RSC-032')
+  })
+  it('no RSC-032 for a WebP image target under 3.3 (WebP is core)', () => {
+    const { pkg, container } = setupWebp()
+    expect(validateContentDocs(pkg, container, '3.3').map((m) => m.id)).not.toContain('RSC-032')
+  })
+})
+
+describe('validateContentDocs — deprecated content elements (RSC-017)', () => {
+  it('warns for epub:switch/epub:trigger at 3.2+ but not at 3.0', () => {
+    const body =
+      '<epub:switch><epub:case>a</epub:case></epub:switch><epub:trigger ev:observer="o"/>'
+    const { pkg, container } = setupBody(body)
+    expect(validateContentDocs(pkg, container, '3.2').filter((m) => m.id === 'RSC-017').length).toBe(2)
+    expect(validateContentDocs(pkg, container, '3.0').some((m) => m.id === 'RSC-017')).toBe(false)
   })
 })

@@ -7,7 +7,7 @@ import { findDescendants, type XmlNode } from '../io/xml.js'
 import { isKnownHtmlElement } from '../util/html-elements.js'
 import { analyzeCss } from '../parse/css.js'
 import { validateCss } from './css.js'
-import { BLESSED_FONT_TYPES } from '../util/media-types.js'
+import { coreMediaTypes, atLeast, type EpubVersion } from '../versions.js'
 
 const REMOTE_ALLOWED: ReadonlySet<RefType> = new Set<RefType>(['hyperlink', 'cite', 'audio', 'video'])
 const HTML_NS = 'http://www.w3.org/1999/xhtml'
@@ -23,36 +23,6 @@ const BLESSED_CONTENT_TYPES: ReadonlySet<string> = new Set<string>([
 
 function isBlessedContentType(mediaType: string | undefined): boolean {
   return mediaType !== undefined && BLESSED_CONTENT_TYPES.has(mediaType)
-}
-
-const CORE_MEDIA_TYPES: ReadonlySet<string> = new Set<string>([
-  // images
-  'image/gif',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/svg+xml',
-  // audio
-  'audio/mpeg',
-  'audio/mp4',
-  // fonts (shared blessed-font set)
-  ...BLESSED_FONT_TYPES,
-  // blessed content / script / style / other core types
-  'application/xhtml+xml',
-  'text/javascript',
-  'application/javascript',
-  'application/ecmascript',
-  'text/css',
-  'application/pls+xml',
-  'application/smil+xml',
-])
-
-function isCoreMediaType(mediaType: string | undefined): boolean {
-  if (mediaType === undefined) return false
-  if (CORE_MEDIA_TYPES.has(mediaType)) return true
-  if (mediaType.startsWith('video/')) return true // all video/* are EPUB 3 core media types
-  if (/^audio\/ogg\s*;\s*codecs=opus$/i.test(mediaType)) return true // Opus in Ogg
-  return false
 }
 
 // Walk the manifest `fallback` chain (each fallback is a manifest item id) and
@@ -78,7 +48,11 @@ function hasFallbackToBlessed(item: ManifestItem, byId: Map<string, ManifestItem
   return hasFallbackTo(item, byId, (i) => isBlessedContentType(i.mediaType))
 }
 
-export function validateContentDocs(pkg: PackageDocument, container: EpubContainer): Message[] {
+export function validateContentDocs(
+  pkg: PackageDocument,
+  container: EpubContainer,
+  version: EpubVersion,
+): Message[] {
   const messages: Message[] = []
   const manifest = manifestPathMap(pkg)
 
@@ -108,10 +82,11 @@ export function validateContentDocs(pkg: PackageDocument, container: EpubContain
   }
 
   for (const doc of docs.values()) {
-    messages.push(...checkReferences(doc, container, manifest, byId, spinePaths))
+    messages.push(...checkReferences(doc, container, manifest, byId, spinePaths, version))
     messages.push(...checkFragments(doc, docs, manifest))
     messages.push(...checkElements(doc))
     messages.push(...checkLinkElements(doc))
+    messages.push(...checkDeprecatedElements(doc, version))
     for (const style of doc.inlineStyles) {
       const a = analyzeCss(style.text, doc.path, style.context)
       messages.push(...a.messages)
@@ -178,6 +153,13 @@ function checkElements(doc: ContentDocument): Message[] {
   return messages
 }
 
+function checkDeprecatedElements(doc: ContentDocument, version: EpubVersion): Message[] {
+  if (!atLeast(version, '3.2')) return []
+  return doc.deprecatedElements.map((d) =>
+    msg('RSC-017', d.loc, `The "epub:${d.name}" element is deprecated.`),
+  )
+}
+
 // EPUB alternate-style-sheet vocabulary terms that conflict when both appear.
 const ALTCSS_CONFLICTS: ReadonlyArray<readonly [string, string]> = [
   ['vertical', 'horizontal'],
@@ -207,8 +189,17 @@ function checkReferences(
   manifest: Map<string, ManifestItem>,
   byId: Map<string, ManifestItem>,
   spinePaths: ReadonlySet<string>,
+  version: EpubVersion,
 ): Message[] {
   const messages: Message[] = []
+  const core = coreMediaTypes(version)
+  const isCore = (mediaType: string | undefined): boolean => {
+    if (mediaType === undefined) return false
+    if (core.has(mediaType)) return true
+    if (mediaType.startsWith('video/')) return true // all video/* are core in every 3.x
+    if (atLeast(version, '3.3') && /^audio\/ogg\s*;\s*codecs=opus$/i.test(mediaType)) return true // Opus added in 3.3
+    return false
+  }
   for (const ref of doc.refs) {
     const url = ref.url
     if (url.startsWith('#')) continue // same-document fragment; handled by the fragment check
@@ -242,8 +233,8 @@ function checkReferences(
       if (
         item &&
         !ref.hasIntrinsicFallback &&
-        !isCoreMediaType(item.mediaType) &&
-        !hasFallbackTo(item, byId, (i) => isCoreMediaType(i.mediaType))
+        !isCore(item.mediaType) &&
+        !hasFallbackTo(item, byId, (i) => isCore(i.mediaType))
       ) {
         messages.push(msg('RSC-032', ref.loc, target, item.mediaType ?? ''))
       }
