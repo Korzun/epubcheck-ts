@@ -17,7 +17,7 @@ export { parseContent } from './parse/content.js'
 export { validateContentDocs } from './checks/content.js'
 export { parseCss, analyzeCss } from './parse/css.js'
 export { validateCss, validateCssDocs } from './checks/css.js'
-export { buildReport } from './report.js'
+export { buildReport, ValidationThreshold } from './report.js'
 export { msg } from './messages/format.js'
 
 // Types
