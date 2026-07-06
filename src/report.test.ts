@@ -38,6 +38,16 @@ describe('buildReport', () => {
     expect(buildReport([], undefined, 'USAGE').valid).toBe(true)
   })
 
+  it('FATAL threshold rejects only on FATAL', () => {
+    expect(buildReport([m('FATAL')], undefined, 'FATAL').valid).toBe(false)
+    expect(buildReport([m('ERROR')], undefined, 'FATAL').valid).toBe(true)
+  })
+
+  it('INFO threshold rejects on info but not usage', () => {
+    expect(buildReport([m('INFO')], undefined, 'INFO').valid).toBe(false)
+    expect(buildReport([m('USAGE')], undefined, 'INFO').valid).toBe(true)
+  })
+
   it('records the epub version when provided', () => {
     expect(buildReport([], '3.0').epubVersion).toBe('3.0')
   })

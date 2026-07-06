@@ -148,4 +148,11 @@ describe('validateEpub', () => {
     expect(report.valid).toBe(true)
     expect(report.threshold).toBe('NONE')
   })
+
+  it('rejects a FATAL under the default threshold (contrast with NONE)', async () => {
+    const report = await validateEpub(enc('not a zip'))
+    expect(report.fatal).toBe(true)
+    expect(report.valid).toBe(false)
+    expect(report.threshold).toBe('ERROR')
+  })
 })
