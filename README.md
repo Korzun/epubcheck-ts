@@ -24,7 +24,7 @@ projects make deliberately different trade-offs:
 | | epubcheck-ts (this project) | `@likecoin/epubcheck-ts` |
 | --- | --- | --- |
 | Goal | A small, embeddable, dependency-light validator | Near-complete parity (~99%) with Java EPUBCheck |
-| Maturity | Early-stage; a curated subset of checks | Mature; ~1300 tests, EPUB 2.0 & 3.0–3.3 |
+| Maturity | Early-stage; a curated subset of checks; accepts all published revisions (2.0, 2.0.1, 3.0, 3.0.1, 3.2, 3.3) as `version` targets | Mature; ~1300 tests, EPUB 2.0 & 3.0–3.3 |
 | Validation approach | Hand-written checks against parsed structures | Ports EPUBCheck's RELAX NG / Schematron / XSD schemas |
 | Schema engine | None | `libxml2-wasm` + `fontoxpath` + `slimdom` (XPath 3.1) |
 | Runtime deps | 3 (`fflate`, `saxes`, `css-tree`) — no WASM | 6, including a WASM libxml2 build |
@@ -40,7 +40,10 @@ vocabulary, so their output is broadly compatible.
 
 ## Features
 
-- **EPUB 2 and EPUB 3** — version is auto-detected from the package document.
+- **EPUB 2 and EPUB 3** — the package document only distinguishes the major
+  version (`2.0` or `3.0`); all published revisions (`2.0`, `2.0.1`, `3.0`,
+  `3.0.1`, `3.2`, `3.3`) are accepted as `version` targets and are
+  caller-selected via `options.version`.
 - **Runtime-agnostic** — pure functions over byte buffers; no filesystem access.
 - **Layered, functional API** — call the all-in-one `validateEpub`, or compose
   the underlying parse/check functions yourself.
@@ -102,17 +105,22 @@ const { validateEpub } = require('@korzun/epubcheck-ts')
 ### Options
 
 ```ts
-// Force validation against a specific version. If the detected version differs,
-// a PKG-001 warning is reported.
-await validateEpub(bytes, { version: '3.0' })
+// Force validation against a specific revision (e.g. '3.2' or '3.3'). If the
+// detected major version differs, a PKG-001 warning is reported.
+await validateEpub(bytes, { version: '3.2' })
 ```
+
+When no `version` is given, EPUB 3 files are validated against the newest
+revision (`3.3`) and EPUB 2 against `2.0`. `report.epubVersion` is the
+revision whose rules were applied (the target), not necessarily the file's
+declared major.
 
 ### The report
 
 ```ts
 interface Report {
   messages: Message[]
-  epubVersion?: '2.0' | '3.0'
+  epubVersion?: EpubVersion
   counts: Record<Severity, number> // FATAL | ERROR | WARNING | INFO | USAGE
   fatal: boolean   // any FATAL message present
   valid: boolean   // no FATAL and no ERROR messages
