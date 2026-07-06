@@ -65,6 +65,33 @@ describe('parseOpf', () => {
     expect(pkg).toBeUndefined()
     expect(messages[0]?.id).toBe('RSC-005')
   })
+
+  it('captures the <bindings> element location when present', () => {
+    const { pkg } = parseOpf(
+      container(
+        PKG(
+          META +
+            '<manifest><item id="x" href="x.xhtml" media-type="application/xhtml+xml"/></manifest>' +
+            '<spine><itemref idref="x"/></spine>' +
+            '<bindings><mediaType handler="h" media-type="application/x-foo"/></bindings>',
+        ),
+      ),
+    )
+    expect(pkg?.bindings).toBeDefined()
+  })
+
+  it('leaves bindings undefined when the element is absent', () => {
+    const { pkg } = parseOpf(
+      container(
+        PKG(
+          META +
+            '<manifest><item id="x" href="x.xhtml" media-type="application/xhtml+xml"/></manifest>' +
+            '<spine><itemref idref="x"/></spine>',
+        ),
+      ),
+    )
+    expect(pkg?.bindings).toBeUndefined()
+  })
 })
 
 import { manifestPathMap } from './opf.js'
