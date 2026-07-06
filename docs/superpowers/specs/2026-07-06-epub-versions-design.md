@@ -129,9 +129,16 @@ Replaces the current inline `detectedVersion` logic:
 - **Detect major**: `pkg.version === '2.0'` → `'2.0'`; `=== '3.0'` → `'3.0'`;
   otherwise `undefined` (which still triggers `OPF-001` in `checkPackage`).
 - **Resolve target**: if `options.version` is set, that is the target;
-  otherwise the **default is the detected major's base** (`'2.0'` or `'3.0'`) —
-  the most lenient ruleset, so a bare EPUB 3 file emits no deprecation warnings
-  unless the caller explicitly opts into `3.2`/`3.3`.
+  otherwise the **default is the detected major's newest revision** — `'3.3'` for
+  EPUB 3, `'2.0'` for EPUB 2. This matches epubcheck's own "validate against the
+  newest supported version" default and, crucially, keeps modern files using
+  newer Core Media Types (WebP, Opus, `application/ecmascript`) clean by default;
+  those types are *not* core at 3.0, so a lower default would newly flag them
+  (`RSC-032`). Callers wanting the stricter/older ruleset pin `version: '3.0'`.
+- **`report.epubVersion`** carries the **resolved target** (the revision whose
+  rules were applied), not necessarily the file's declared major. A `version="3.0"`
+  file validated with no option reports `epubVersion: '3.3'`. The README documents
+  this "validated-against" semantics.
 - **PKG-001 mismatch** compares **majors**:
   `majorVersion(target) !== detectedMajor`. So `{version:'3.3'}` against a
   `version="3.0"` file is not a false mismatch, but `{version:'3.3'}` against a
@@ -210,7 +217,7 @@ Colocated unit tests beside source; integration fixtures under `test/`.
 - **`src/validate.test.ts`** — target threading end-to-end: `{version:'3.3'}` on
   a `version="3.0"` file yields `epubVersion:'3.3'` and no PKG-001;
   `{version:'3.3'}` on a `version="2.0"` file fires PKG-001; default (no option)
-  resolves to the major base.
+  on a `version="3.0"` file resolves to `'3.3'`.
 - **`test/integration/`** — a small set of per-revision fixture EPUBs exercising
   the deltas (a 3.2 file with a deprecated `<bindings>`, a 3.3 file using WebP,
   etc.).
