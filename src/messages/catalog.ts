@@ -1,5 +1,14 @@
 export type Severity = 'FATAL' | 'ERROR' | 'WARNING' | 'INFO' | 'USAGE'
 
+/** Severity ordering used by rejection thresholds. Higher = more severe. */
+export const SEVERITY_RANK: Record<Severity, number> = {
+  FATAL: 5,
+  ERROR: 4,
+  WARNING: 3,
+  INFO: 2,
+  USAGE: 1,
+}
+
 /**
  * Message catalog (id -> severity + template), porting epubcheck's message
  * vocabulary. Templates use positional placeholders: %1$s, %2$s, ...

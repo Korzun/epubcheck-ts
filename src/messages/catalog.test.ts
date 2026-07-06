@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CATALOG } from './catalog.js'
+import { CATALOG, SEVERITY_RANK } from './catalog.js'
 
 describe('CATALOG', () => {
   it('defines OCF/container message ids with severities', () => {
@@ -48,6 +48,15 @@ describe('CATALOG', () => {
   it('NAV-010 template carries two placeholders', () => {
     expect(CATALOG['NAV-010']?.template).toContain('%1$s')
     expect(CATALOG['NAV-010']?.template).toContain('%2$s')
+  })
+})
+
+describe('SEVERITY_RANK', () => {
+  it('orders severities from FATAL (highest) to USAGE (lowest)', () => {
+    expect(SEVERITY_RANK.FATAL).toBeGreaterThan(SEVERITY_RANK.ERROR)
+    expect(SEVERITY_RANK.ERROR).toBeGreaterThan(SEVERITY_RANK.WARNING)
+    expect(SEVERITY_RANK.WARNING).toBeGreaterThan(SEVERITY_RANK.INFO)
+    expect(SEVERITY_RANK.INFO).toBeGreaterThan(SEVERITY_RANK.USAGE)
   })
 
   it('defines the navigation reading-order message id', () => {
