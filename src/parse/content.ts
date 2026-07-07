@@ -4,6 +4,8 @@ import { resolvePath } from '../util/path.js'
 import type { Location, Message } from '../messages/format.js'
 import type { ManifestItem } from './opf.js'
 
+const OPS_NS = 'http://www.idpf.org/2007/ops'
+
 export type RefType =
   | 'hyperlink'
   | 'image'
@@ -31,6 +33,11 @@ export interface InlineStyle {
   loc: Location
 }
 
+export interface DeprecatedElement {
+  name: 'switch' | 'trigger'
+  loc: Location
+}
+
 export interface ContentDocument {
   path: string
   root: XmlNode
@@ -39,6 +46,7 @@ export interface ContentDocument {
   /** id attribute value → 1-based ordinal among id-bearing elements in document order (first occurrence wins). */
   idPositions: Map<string, number>
   inlineStyles: InlineStyle[]
+  deprecatedElements: DeprecatedElement[]
 }
 
 /** Extract the URL of each srcset candidate ("url descriptor, url descriptor"). */
@@ -126,6 +134,7 @@ function collect(
   ids: Set<string>,
   idPositions: Map<string, number>,
   inlineStyles: InlineStyle[],
+  deprecated: DeprecatedElement[],
 ): void {
   for (const child of node.children ?? []) {
     if (child.type !== 'element') continue
@@ -135,6 +144,9 @@ function collect(
       ids.add(id)
       if (!idPositions.has(id)) idPositions.set(id, idPositions.size + 1)
     }
+    if (child.ns === OPS_NS && (child.name === 'switch' || child.name === 'trigger')) {
+      deprecated.push({ name: child.name, loc: child.loc })
+    }
     addRefs(child, parent, attrs, refs)
     if (child.name === 'style') {
       inlineStyles.push({ context: 'stylesheet', text: textContent(child), loc: child.loc })
@@ -143,7 +155,7 @@ function collect(
     if (styleAttr) {
       inlineStyles.push({ context: 'declarationList', text: styleAttr, loc: child.loc })
     }
-    collect(child, child.name, refs, ids, idPositions, inlineStyles)
+    collect(child, child.name, refs, ids, idPositions, inlineStyles, deprecated)
   }
 }
 
@@ -168,6 +180,7 @@ export function parseContent(
   const ids = new Set<string>()
   const idPositions = new Map<string, number>()
   const inlineStyles: InlineStyle[] = []
-  collect(root, undefined, refs, ids, idPositions, inlineStyles)
-  return { doc: { path, root, refs, ids, idPositions, inlineStyles }, messages }
+  const deprecatedElements: DeprecatedElement[] = []
+  collect(root, undefined, refs, ids, idPositions, inlineStyles, deprecatedElements)
+  return { doc: { path, root, refs, ids, idPositions, inlineStyles, deprecatedElements }, messages }
 }

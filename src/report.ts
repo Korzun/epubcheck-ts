@@ -1,5 +1,6 @@
 import type { Message } from './messages/format.js'
 import { SEVERITY_RANK, type Severity } from './messages/catalog.js'
+import type { EpubVersion } from './versions.js'
 
 /**
  * Rejection threshold: the least-severe level that still marks a report
@@ -20,7 +21,7 @@ export type ValidationThreshold = (typeof ValidationThreshold)[keyof typeof Vali
 
 export interface Report {
   messages: Message[]
-  epubVersion?: '2.0' | '3.0'
+  epubVersion?: EpubVersion
   counts: Record<Severity, number>
   threshold: ValidationThreshold
   fatal: boolean
@@ -29,7 +30,7 @@ export interface Report {
 
 export function buildReport(
   messages: Message[],
-  epubVersion?: '2.0' | '3.0',
+  epubVersion?: EpubVersion,
   threshold: ValidationThreshold = 'ERROR',
 ): Report {
   const counts: Record<Severity, number> = { FATAL: 0, ERROR: 0, WARNING: 0, INFO: 0, USAGE: 0 }

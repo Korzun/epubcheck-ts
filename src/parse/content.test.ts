@@ -94,6 +94,25 @@ describe('parseContent — intrinsic fallback', () => {
   })
 })
 
+describe('parseContent — deprecated elements', () => {
+  it('captures epub:switch and epub:trigger occurrences', () => {
+    const xhtml =
+      '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:ev="http://www.w3.org/2001/xml-events">' +
+      '<head><title>t</title></head><body>' +
+      '<epub:switch><epub:case>a</epub:case></epub:switch>' +
+      '<epub:trigger ev:observer="x"/>' +
+      '</body></html>'
+    const { doc } = parseContent(item, container(xhtml))
+    const names = (doc?.deprecatedElements ?? []).map((d) => d.name).sort()
+    expect(names).toEqual(['switch', 'trigger'])
+  })
+
+  it('has empty deprecatedElements for a plain document', () => {
+    const { doc } = parseContent(item, container(DOC('<p>x</p>')))
+    expect(doc?.deprecatedElements).toEqual([])
+  })
+})
+
 describe('parseContent — id positions', () => {
   it('records 1-based id positions in document order', () => {
     const { doc } = parseContent(item, container(DOC('<h2 id="a">A</h2><p id="b">B</p><h2 id="c">C</h2>')))

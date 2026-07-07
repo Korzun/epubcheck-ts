@@ -37,6 +37,7 @@ export interface PackageDocument {
   manifest: ManifestItem[]
   spinePresent: boolean
   spine: SpineItem[]
+  bindings?: Location
   loc: Location
 }
 
@@ -73,6 +74,7 @@ export function parseOpf(container: EpubContainer): { pkg?: PackageDocument; mes
   const metadataEl = firstChild(root, 'metadata')
   const manifestEl = firstChild(root, 'manifest')
   const spineEl = firstChild(root, 'spine')
+  const bindingsEl = firstChild(root, 'bindings')
 
   const metadata: Metadata = { identifiers: [], titles: [], languages: [], modifiedCount: 0 }
   if (metadataEl) {
@@ -125,6 +127,7 @@ export function parseOpf(container: EpubContainer): { pkg?: PackageDocument; mes
     manifest,
     spinePresent: spineEl !== undefined,
     spine,
+    bindings: bindingsEl?.loc,
     loc: root.loc,
   }
   return { pkg, messages }

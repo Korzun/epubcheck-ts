@@ -57,6 +57,7 @@ export const CATALOG: Record<string, { severity: Severity; template: string }> =
   'CSS-015': { severity: 'ERROR', template: 'Alternative style sheets must have a title.' },
   'CSS-019': { severity: 'WARNING', template: 'CSS font-face declaration has no attributes.' },
   'RSC-013': { severity: 'ERROR', template: 'Fragment identifier is used in a reference to a stylesheet resource.' },
+  'RSC-017': { severity: 'WARNING', template: 'Warning while parsing file: %1$s' },
   'RSC-030': { severity: 'ERROR', template: 'File URLs are not allowed in EPUB, but found "%1$s".' },
   'RSC-031': { severity: 'WARNING', template: 'Remote resource references should use HTTPS, but found "%1$s".' },
   'RSC-032': { severity: 'ERROR', template: 'Fallback must be provided for foreign resources, but found none for resource "%1$s" of type "%2$s".' },
