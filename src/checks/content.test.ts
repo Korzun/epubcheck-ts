@@ -46,6 +46,15 @@ function setupWebp(): { pkg: PackageDocument; container: EpubContainer } {
   return { pkg, container }
 }
 
+// A bare <audio src> pointing at an Opus manifest item, with no <source> intrinsic
+// fallback and no manifest fallback — used to probe revision-sensitive RSC-032 gating.
+function setupOpus(): { pkg: PackageDocument; container: EpubContainer } {
+  const { pkg, container } = setup({ 'c1.xhtml': '<audio src="a.opus"></audio>' })
+  pkg.manifest.push({ id: 'opus', href: 'a.opus', mediaType: 'audio/ogg; codecs=opus', properties: [], loc: LOC })
+  container.resources.set('EPUB/a.opus', { path: 'EPUB/a.opus', bytes: enc('x'), compression: 'deflate' })
+  return { pkg, container }
+}
+
 // A single content doc whose body is the given fragment; DOC() already declares
 // xmlns:epub and xmlns:ev so epub:switch/epub:trigger parse cleanly.
 function setupBody(body: string): { pkg: PackageDocument; container: EpubContainer } {
@@ -260,6 +269,14 @@ describe('validateContentDocs — revision-sensitive core media types', () => {
   })
   it('no RSC-032 for a WebP image target under 3.3 (WebP is core)', () => {
     const { pkg, container } = setupWebp()
+    expect(validateContentDocs(pkg, container, '3.3').map((m) => m.id)).not.toContain('RSC-032')
+  })
+  it('RSC-032 for an Opus audio target under 3.2 (Opus not yet core)', () => {
+    const { pkg, container } = setupOpus()
+    expect(validateContentDocs(pkg, container, '3.2').map((m) => m.id)).toContain('RSC-032')
+  })
+  it('no RSC-032 for an Opus audio target under 3.3 (Opus is core)', () => {
+    const { pkg, container } = setupOpus()
     expect(validateContentDocs(pkg, container, '3.3').map((m) => m.id)).not.toContain('RSC-032')
   })
 })

@@ -40,6 +40,9 @@ export async function validateEpub(
     const container = await openEpub(input)
     messages.push(...validateOcf(container))
 
+    // Everything after openEpub is a non-throwing pure function, so the catch
+    // below only ever fires from openEpub — at which point `messages` is still
+    // empty. Accumulated messages therefore never bleed into the error report.
     const { pkg, messages: opfMessages } = parseOpf(container)
     messages.push(...opfMessages)
 
