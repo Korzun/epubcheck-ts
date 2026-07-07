@@ -13,4 +13,11 @@ describe('public API', () => {
     expect(ValidationThreshold.NONE).toBe('NONE')
     expect(ValidationThreshold.USAGE).toBe('USAGE')
   })
+
+  it('exports the EpubVersion type via a validate option', async () => {
+    const mod = await import('./index.js')
+    // Type-only export: assert the value entry points still resolve and the
+    // module shape is intact (compile-time coverage is the real check).
+    expect(typeof mod.validateEpub).toBe('function')
+  })
 })

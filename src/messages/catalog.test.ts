@@ -95,6 +95,11 @@ describe('CATALOG', () => {
       template: 'Fallback must be provided for foreign resources, but found none for resource "%1$s" of type "%2$s".',
     })
   })
+
+  it('RSC-017 is a WARNING with a single parameter (used for deprecations)', () => {
+    expect(CATALOG['RSC-017']?.severity).toBe('WARNING')
+    expect(CATALOG['RSC-017']?.template).toContain('%1$s')
+  })
 })
 
 describe('SEVERITY_RANK', () => {

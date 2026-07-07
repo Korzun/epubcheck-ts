@@ -31,3 +31,4 @@ export type { PackageDocument, ManifestItem, SpineItem, Metadata, DcIdentifier }
 export type { NavDocument, NavSection } from './parse/nav.js'
 export type { ContentDocument, ContentRef, RefType, InlineStyle } from './parse/content.js'
 export type { CssDocument, CssRef, CssRefType, CssDeclaration, FontFace, CssAnalysis } from './parse/css.js'
+export type { EpubVersion } from './versions.js'

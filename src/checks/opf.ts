@@ -2,11 +2,21 @@ import { getResource, type EpubContainer } from '../io/zip.js'
 import { resolvePath, isRemote } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
 import { manifestPathMap, type PackageDocument } from '../parse/opf.js'
+import { majorVersion, atLeast, type EpubVersion } from '../versions.js'
 
 const XHTML_MEDIA_TYPE = 'application/xhtml+xml'
 
-export function validateOpf(pkg: PackageDocument, container: EpubContainer): Message[] {
-  return [...checkPackage(pkg), ...checkManifest(pkg, container), ...checkSpineAndNav(pkg)]
+export function validateOpf(
+  pkg: PackageDocument,
+  container: EpubContainer,
+  version: EpubVersion | undefined,
+): Message[] {
+  return [
+    ...checkPackage(pkg),
+    ...checkManifest(pkg, container),
+    ...checkSpineAndNav(pkg, version),
+    ...checkDeprecatedFeatures(pkg, version),
+  ]
 }
 
 /**
@@ -95,7 +105,7 @@ function checkManifest(pkg: PackageDocument, container: EpubContainer): Message[
   return messages
 }
 
-function checkSpineAndNav(pkg: PackageDocument): Message[] {
+function checkSpineAndNav(pkg: PackageDocument, version: EpubVersion | undefined): Message[] {
   const messages: Message[] = []
 
   if (!pkg.spinePresent) {
@@ -115,7 +125,7 @@ function checkSpineAndNav(pkg: PackageDocument): Message[] {
   }
 
   // Navigation document is an EPUB 3 requirement only.
-  if (pkg.version === '3.0') {
+  if (version !== undefined && majorVersion(version) === '3.0') {
     const navItems = pkg.manifest.filter((i) => i.properties.includes('nav'))
     if (navItems.length !== 1) {
       messages.push(msg('RSC-005', pkg.loc, pkg.path, `Exactly one manifest item must declare the "nav" property (number of "nav" items: ${navItems.length}).`))
@@ -127,5 +137,13 @@ function checkSpineAndNav(pkg: PackageDocument): Message[] {
     }
   }
 
+  return messages
+}
+
+function checkDeprecatedFeatures(pkg: PackageDocument, version: EpubVersion | undefined): Message[] {
+  const messages: Message[] = []
+  if (version !== undefined && atLeast(version, '3.2') && pkg.bindings) {
+    messages.push(msg('RSC-017', pkg.bindings, 'Use of the bindings element is deprecated'))
+  }
   return messages
 }

@@ -51,4 +51,9 @@ describe('buildReport', () => {
   it('records the epub version when provided', () => {
     expect(buildReport([], '3.0').epubVersion).toBe('3.0')
   })
+
+  it('carries the resolved epubVersion through', () => {
+    const r = buildReport([], '3.3')
+    expect(r.epubVersion).toBe('3.3')
+  })
 })

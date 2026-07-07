@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { EpubContainer, Resource } from '../io/zip.js'
 import type { PackageDocument, ManifestItem, SpineItem } from '../parse/opf.js'
+import type { EpubVersion } from '../versions.js'
 import { validateOpf, checkUndeclaredResources } from './opf.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
@@ -29,8 +30,8 @@ function validPkg(overrides: Partial<PackageDocument> = {}): PackageDocument {
   }
 }
 
-const ids = (pkg: PackageDocument, c: EpubContainer = emptyContainer(['EPUB/nav.xhtml'])) =>
-  validateOpf(pkg, c).map((m) => m.id)
+const ids = (pkg: PackageDocument, version: EpubVersion = '3.3', c: EpubContainer = emptyContainer(['EPUB/nav.xhtml'])) =>
+  validateOpf(pkg, c, version).map((m) => m.id)
 
 describe('validateOpf — package level', () => {
   it('passes a valid package (no package-level messages)', () => {
@@ -50,12 +51,12 @@ describe('validateOpf — package level', () => {
   })
   it('RSC-005 when dc:identifier / dc:title / dc:language are missing', () => {
     const pkg = validPkg({ metadata: { identifiers: [], titles: [], languages: [], modifiedCount: 1 } })
-    const msgs = validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml']))
+    const msgs = validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml']), '3.3')
     expect(msgs.filter((m) => m.id === 'RSC-005').length).toBeGreaterThanOrEqual(3)
   })
   it('RSC-005 when dcterms:modified is not present exactly once', () => {
     const pkg = validPkg({ metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 0 } })
-    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml'])).some((m) => m.id === 'RSC-005' && m.message.includes('dcterms:modified'))).toBe(true)
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml']), '3.3').some((m) => m.id === 'RSC-005' && m.message.includes('dcterms:modified'))).toBe(true)
   })
 })
 
@@ -65,32 +66,32 @@ describe('validateOpf — manifest', () => {
   it('RSC-005 when an item is missing a required attribute', () => {
     const bad: ManifestItem = { id: 'c1', href: undefined, mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
     const pkg = validPkg({ manifest: [navItem, bad], spine: [{ idref: 'nav', linear: true, properties: [], loc: LOC }] })
-    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml'])).some((m) => m.id === 'RSC-005' && m.message.includes('required attribute'))).toBe(true)
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml']), '3.3').some((m) => m.id === 'RSC-005' && m.message.includes('required attribute'))).toBe(true)
   })
 
   it('RSC-005 on a duplicate manifest item id', () => {
     const dup: ManifestItem = { id: 'nav', href: 'c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
     const pkg = validPkg({ manifest: [navItem, dup] })
-    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml', 'EPUB/c1.xhtml'])).some((m) => m.id === 'RSC-005' && m.message.includes('Duplicate manifest item id'))).toBe(true)
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml', 'EPUB/c1.xhtml']), '3.3').some((m) => m.id === 'RSC-005' && m.message.includes('Duplicate manifest item id'))).toBe(true)
   })
 
   it('OPF-074 when two items resolve to the same href', () => {
     const a: ManifestItem = { id: 'a', href: 'c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
     const b: ManifestItem = { id: 'b', href: './c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
     const pkg = validPkg({ manifest: [navItem, a, b] })
-    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml', 'EPUB/c1.xhtml'])).map((m) => m.id)).toContain('OPF-074')
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml', 'EPUB/c1.xhtml']), '3.3').map((m) => m.id)).toContain('OPF-074')
   })
 
   it('RSC-001 when an item href is not present in the container', () => {
     const missing: ManifestItem = { id: 'm', href: 'gone.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
     const pkg = validPkg({ manifest: [navItem, missing] })
-    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml'])).map((m) => m.id)).toContain('RSC-001')
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml']), '3.3').map((m) => m.id)).toContain('RSC-001')
   })
 
   it('does not report RSC-001 for a remote href', () => {
     const remote: ManifestItem = { id: 'r', href: 'https://example.com/x.mp4', mediaType: 'video/mp4', properties: [], loc: LOC }
     const pkg = validPkg({ manifest: [navItem, remote] })
-    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml'])).map((m) => m.id)).not.toContain('RSC-001')
+    expect(validateOpf(pkg, emptyContainer(['EPUB/nav.xhtml']), '3.3').map((m) => m.id)).not.toContain('RSC-001')
   })
 })
 
@@ -100,27 +101,46 @@ describe('validateOpf — spine and nav', () => {
 
   it('RSC-005 when there is no spine', () => {
     const pkg = validPkg({ spinePresent: false, spine: [] })
-    expect(validateOpf(pkg, c).some((m) => m.id === 'RSC-005' && m.message.includes('spine element'))).toBe(true)
+    expect(validateOpf(pkg, c, '3.3').some((m) => m.id === 'RSC-005' && m.message.includes('spine element'))).toBe(true)
   })
   it('RSC-005 when the spine has no itemref', () => {
     const pkg = validPkg({ spinePresent: true, spine: [] })
-    expect(validateOpf(pkg, c).some((m) => m.id === 'RSC-005' && m.message.includes('at least one itemref'))).toBe(true)
+    expect(validateOpf(pkg, c, '3.3').some((m) => m.id === 'RSC-005' && m.message.includes('at least one itemref'))).toBe(true)
   })
   it('OPF-049 when an itemref idref has no manifest item', () => {
     const pkg = validPkg({ spine: [{ idref: 'missing', linear: true, properties: [], loc: LOC }] })
-    expect(validateOpf(pkg, c).map((m) => m.id)).toContain('OPF-049')
+    expect(validateOpf(pkg, c, '3.3').map((m) => m.id)).toContain('OPF-049')
   })
   it('OPF-033 when no spine item is linear', () => {
     const pkg = validPkg({ spine: [{ idref: 'nav', linear: false, properties: [], loc: LOC }] })
-    expect(validateOpf(pkg, c).map((m) => m.id)).toContain('OPF-033')
+    expect(validateOpf(pkg, c, '3.3').map((m) => m.id)).toContain('OPF-033')
   })
   it('RSC-005 when there is not exactly one nav item', () => {
     const pkg = validPkg({ manifest: [{ ...navItem, properties: [] }] })
-    expect(validateOpf(pkg, c).some((m) => m.id === 'RSC-005' && m.message.includes('"nav" property'))).toBe(true)
+    expect(validateOpf(pkg, c, '3.3').some((m) => m.id === 'RSC-005' && m.message.includes('"nav" property'))).toBe(true)
   })
   it('RSC-005 when the nav item is not XHTML', () => {
     const pkg = validPkg({ manifest: [{ ...navItem, mediaType: 'text/html' }] })
-    expect(validateOpf(pkg, c).some((m) => m.id === 'RSC-005' && m.message.includes('Navigation Document'))).toBe(true)
+    expect(validateOpf(pkg, c, '3.3').some((m) => m.id === 'RSC-005' && m.message.includes('Navigation Document'))).toBe(true)
+  })
+})
+
+describe('validateOpf — bindings deprecation (RSC-017)', () => {
+  it('warns at 3.2+ when a bindings element is present', () => {
+    const pkg = validPkg({ bindings: LOC })
+    expect(ids(pkg, '3.2')).toContain('RSC-017')
+    expect(ids(pkg, '3.3')).toContain('RSC-017')
+  })
+  it('does not warn at 3.0 (bindings not yet deprecated)', () => {
+    const pkg = validPkg({ bindings: LOC })
+    expect(ids(pkg, '3.0')).not.toContain('RSC-017')
+  })
+  it('does not warn when there is no bindings element', () => {
+    expect(ids(validPkg(), '3.3')).not.toContain('RSC-017')
+  })
+  it('the RSC-017 message names the bindings element', () => {
+    const out = validateOpf(validPkg({ bindings: LOC }), emptyContainer(['EPUB/nav.xhtml']), '3.3')
+    expect(out.some((m) => m.id === 'RSC-017' && m.message.includes('bindings element is deprecated'))).toBe(true)
   })
 })
 
