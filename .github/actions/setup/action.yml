@@ -1,0 +1,22 @@
+name: Setup
+description: Set up Node.js and install dependencies.
+
+inputs:
+  node-version:
+    description: Node.js version to use.
+    required: false
+    default: '22'
+
+runs:
+  using: composite
+  steps:
+    # NOTE: do NOT set `registry-url` here. It makes setup-node write an
+    # .npmrc with `_authToken=${NODE_AUTH_TOKEN}`; with no token set that empty
+    # token shadows OIDC Trusted Publishing in the release workflow (npm skips
+    # OIDC when any auth token is configured), causing a masked 404 on publish.
+    - uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: 'npm'
+    - run: npm ci
+      shell: bash
