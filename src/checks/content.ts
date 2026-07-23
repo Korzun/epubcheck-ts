@@ -7,27 +7,14 @@ import { findDescendants, type XmlNode } from '../io/xml.js'
 import { isKnownHtmlElement } from '../util/html-elements.js'
 import { analyzeCss } from '../parse/css.js'
 import { validateCss } from './css.js'
-import { coreMediaTypes, atLeast, type EpubVersion } from '../versions.js'
+import { coreMediaTypes, atLeast, majorVersion, blessedContentTypes, type EpubVersion } from '../versions.js'
 
-const REMOTE_ALLOWED: ReadonlySet<RefType> = new Set<RefType>(['hyperlink', 'cite', 'audio', 'video'])
+// Remote references EPUB 3 permits without RSC-006. EPUB 2 forbids remote
+// publication resources outright; only hyperlink/cite (which are not
+// publication resources) escape (epubcheck ResourceReferencesChecker).
+const REMOTE_ALLOWED_V3: ReadonlySet<RefType> = new Set<RefType>(['hyperlink', 'cite', 'audio', 'video'])
+const REMOTE_ALLOWED_V2: ReadonlySet<RefType> = new Set<RefType>(['hyperlink', 'cite'])
 const HTML_NS = 'http://www.w3.org/1999/xhtml'
-
-// EPUB 3 blessed content-document types (epubcheck isBlessedItemType v3) plus
-// deprecated-blessed types (epubcheck isDeprecatedBlessedItemType).
-const BLESSED_CONTENT_TYPES: ReadonlySet<string> = new Set<string>([
-  'application/xhtml+xml',
-  'image/svg+xml',
-  'text/x-oeb1-document', // deprecated-blessed
-  'text/html', // deprecated-blessed
-])
-
-function isBlessedContentType(mediaType: string | undefined): boolean {
-  return mediaType !== undefined && BLESSED_CONTENT_TYPES.has(mediaType)
-}
-
-function hasFallbackToBlessed(item: ManifestItem, byId: Map<string, ManifestItem>): boolean {
-  return hasFallbackTo(item, byId, (i) => isBlessedContentType(i.mediaType))
-}
 
 export function validateContentDocs(
   pkg: PackageDocument,
@@ -181,14 +168,19 @@ function checkReferences(
     if (atLeast(version, '3.3') && /^audio\/ogg\s*;\s*codecs=opus$/i.test(mediaType)) return true // Opus added in 3.3
     return false
   }
+  const major = majorVersion(version)
+  const remoteAllowed = major === '2.0' ? REMOTE_ALLOWED_V2 : REMOTE_ALLOWED_V3
+  const blessed = blessedContentTypes(version)
+  const isBlessedContent = (mediaType: string | undefined): boolean =>
+    mediaType !== undefined && blessed.has(mediaType)
   for (const ref of doc.refs) {
     const url = ref.url
     if (url.startsWith('#')) continue // same-document fragment; handled by the fragment check
     if (isRemote(url)) {
-      if (!REMOTE_ALLOWED.has(ref.type)) {
+      if (!remoteAllowed.has(ref.type)) {
         messages.push(msg('RSC-006', ref.loc, url))
-      } else if (ref.type !== 'hyperlink') {
-        // Remote-allowed non-hyperlink refs (audio/video/cite) must use HTTPS.
+      } else if (ref.type !== 'hyperlink' && major === '3.0') {
+        // Remote-allowed non-hyperlink refs (audio/video/cite) must use HTTPS. EPUB 3 only.
         const scheme = url.slice(0, url.indexOf(':')).toLowerCase()
         if (scheme !== 'https' && scheme !== 'file') messages.push(msg('RSC-031', ref.loc, url))
       }
@@ -203,7 +195,7 @@ function checkReferences(
     } else if (ref.type === 'hyperlink') {
       const item = manifest.get(target)
       if (item) {
-        if (!isBlessedContentType(item.mediaType) && !hasFallbackToBlessed(item, byId)) {
+        if (!isBlessedContent(item.mediaType) && !hasFallbackTo(item, byId, (i) => isBlessedContent(i.mediaType))) {
           messages.push(msg('RSC-010', ref.loc))
         } else if (!spinePaths.has(target)) {
           messages.push(msg('RSC-011', ref.loc))
