@@ -68,6 +68,10 @@ export async function validateEpub(
         for (const item of pkg.manifest) {
           if (item.id !== undefined) byId.set(item.id, item)
         }
+        // The spine toc idref locates the NCX regardless of its media type
+        // (epubcheck parity): if it points at a non-NCX item, that item is still
+        // parsed as the NCX (surfacing a structural RSC-005) and OPF-050 is
+        // reported separately by validateOpf. Do not media-type-gate this lookup.
         const ncxItem =
           (pkg.spineToc !== undefined ? byId.get(pkg.spineToc) : undefined) ??
           pkg.manifest.find((i) => i.mediaType === NCX_MEDIA_TYPE)
