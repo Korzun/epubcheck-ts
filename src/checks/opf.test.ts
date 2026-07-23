@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { EpubContainer, Resource } from '../io/zip.js'
-import type { PackageDocument, ManifestItem, SpineItem } from '../parse/opf.js'
+import type { PackageDocument, ManifestItem, SpineItem, GuideReference } from '../parse/opf.js'
+import type { Message } from '../messages/format.js'
 import type { EpubVersion } from '../versions.js'
 import { validateOpf, checkUndeclaredResources } from './opf.js'
 
@@ -25,6 +26,7 @@ function validPkg(overrides: Partial<PackageDocument> = {}): PackageDocument {
     manifest: [navItem],
     spinePresent: true,
     spine: [spineItem],
+    guide: [],
     loc: LOC,
     ...overrides,
   }
@@ -151,7 +153,7 @@ describe('checkUndeclaredResources', () => {
       path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
       metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
       manifest: [{ id: 'nav', href: 'nav.xhtml', mediaType: 'application/xhtml+xml', properties: ['nav'], loc: LOC2 }],
-      spinePresent: true, spine: [], loc: LOC2,
+      spinePresent: true, spine: [], guide: [], loc: LOC2,
     }
   }
   function containerWith(paths: string[]): EpubContainer {
@@ -172,5 +174,161 @@ describe('checkUndeclaredResources', () => {
       containerWith(['mimetype', 'META-INF/container.xml', 'META-INF/encryption.xml', 'EPUB/package.opf', 'EPUB/nav.xhtml']),
     )
     expect(msgs).toEqual([])
+  })
+})
+
+describe('EPUB 2 rules', () => {
+  const ids = (ms: Message[]): string[] => ms.map((m) => m.id)
+
+  const ncxItem: ManifestItem = { id: 'ncx', href: 'toc.ncx', mediaType: 'application/x-dtbncx+xml', properties: [], loc: LOC }
+  const contentItem: ManifestItem = { id: 'content', href: 'content.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }
+  const contentRef: SpineItem = { idref: 'content', linear: true, properties: [], loc: LOC }
+
+  // A minimal, fully valid EPUB 2 package: individual tests mutate one field to trigger one rule.
+  function validPkg2(overrides: Partial<PackageDocument> = {}): PackageDocument {
+    return {
+      path: 'EPUB/package.opf',
+      version: '2.0',
+      uniqueIdentifier: 'uid',
+      metadata: { identifiers: [{ id: 'uid', value: 'urn:isbn:1' }], titles: ['T'], languages: ['en'], modifiedCount: 0 },
+      manifest: [ncxItem, contentItem],
+      spinePresent: true,
+      spine: [contentRef],
+      spineToc: 'ncx',
+      spineLoc: LOC,
+      guide: [],
+      loc: LOC,
+      ...overrides,
+    }
+  }
+
+  const container2 = emptyContainer(['EPUB/toc.ncx', 'EPUB/content.xhtml'])
+
+  it('passes a valid EPUB 2 package with zero messages', () => {
+    expect(validateOpf(validPkg2(), container2, '2.0')).toEqual([])
+  })
+
+  it('does not require dcterms:modified for a 2.0 target', () => {
+    const messages = validateOpf(validPkg2(), container2, '2.0')
+    expect(messages.filter((m) => m.message.includes('dcterms:modified'))).toHaveLength(0)
+  })
+
+  it('still requires dcterms:modified for a 3.x target', () => {
+    const pkg3NoModified: PackageDocument = {
+      path: 'EPUB/package.opf',
+      version: '3.0',
+      uniqueIdentifier: 'uid',
+      metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 0 },
+      manifest: [{ id: 'nav', href: 'nav.xhtml', mediaType: 'application/xhtml+xml', properties: ['nav'], loc: LOC }],
+      spinePresent: true,
+      spine: [{ idref: 'nav', linear: true, properties: [], loc: LOC }],
+      guide: [],
+      loc: LOC,
+    }
+    const messages = validateOpf(pkg3NoModified, emptyContainer(['EPUB/nav.xhtml']), '3.3')
+    expect(messages.some((m) => m.message.includes('dcterms:modified'))).toBe(true)
+  })
+
+  it('OPF-031: guide reference to an undeclared file', () => {
+    const ref: GuideReference = { type: 'text', href: 'nowhere.xhtml', loc: LOC }
+    const pkg = validPkg2({ guide: [ref] })
+    expect(ids(validateOpf(pkg, container2, '2.0'))).toContain('OPF-031')
+  })
+
+  it('OPF-032: guide reference to a non-content-document type', () => {
+    const imageItem: ManifestItem = { id: 'cover', href: 'cover.gif', mediaType: 'image/gif', properties: [], loc: LOC }
+    const ref: GuideReference = { type: 'cover', href: 'cover.gif', loc: LOC }
+    const pkg = validPkg2({ manifest: [ncxItem, contentItem, imageItem], guide: [ref] })
+    const container = emptyContainer(['EPUB/toc.ncx', 'EPUB/content.xhtml', 'EPUB/cover.gif'])
+    expect(ids(validateOpf(pkg, container, '2.0'))).toContain('OPF-032')
+  })
+
+  it('OPF-034: duplicate spine idref', () => {
+    const pkg = validPkg2({ spine: [contentRef, contentRef] })
+    expect(ids(validateOpf(pkg, container2, '2.0'))).toContain('OPF-034')
+  })
+
+  it('OPF-035/OPF-037: html and deprecated media types', () => {
+    const htmlItem: ManifestItem = { id: 'html', href: 'html.html', mediaType: 'text/html', properties: [], loc: LOC }
+    const oeb1CssItem: ManifestItem = { id: 'oeb1css', href: 'oeb1.css', mediaType: 'text/x-oeb1-css', properties: [], loc: LOC }
+    const pkg = validPkg2({ manifest: [ncxItem, contentItem, htmlItem, oeb1CssItem] })
+    const container = emptyContainer(['EPUB/toc.ncx', 'EPUB/content.xhtml', 'EPUB/html.html', 'EPUB/oeb1.css'])
+    const out = ids(validateOpf(pkg, container, '2.0'))
+    expect(out).toContain('OPF-035')
+    expect(out).toContain('OPF-037')
+  })
+
+  it('OPF-042: image type in the spine', () => {
+    const imageItem: ManifestItem = { id: 'cover', href: 'cover.gif', mediaType: 'image/gif', properties: [], loc: LOC }
+    const imageRef: SpineItem = { idref: 'cover', linear: true, properties: [], loc: LOC }
+    const pkg = validPkg2({ manifest: [ncxItem, contentItem, imageItem], spine: [contentRef, imageRef] })
+    const container = emptyContainer(['EPUB/toc.ncx', 'EPUB/content.xhtml', 'EPUB/cover.gif'])
+    expect(ids(validateOpf(pkg, container, '2.0'))).toContain('OPF-042')
+  })
+
+  it('OPF-043/OPF-044: foreign spine item without / with non-resolving fallback', () => {
+    const pdfItem: ManifestItem = { id: 'pdf', href: 'doc.pdf', mediaType: 'application/pdf', properties: [], loc: LOC }
+    const pdfRef: SpineItem = { idref: 'pdf', linear: true, properties: [], loc: LOC }
+    const noFallbackPkg = validPkg2({ manifest: [ncxItem, contentItem, pdfItem], spine: [contentRef, pdfRef] })
+    const noFallbackContainer = emptyContainer(['EPUB/toc.ncx', 'EPUB/content.xhtml', 'EPUB/doc.pdf'])
+    expect(ids(validateOpf(noFallbackPkg, noFallbackContainer, '2.0'))).toContain('OPF-043')
+
+    const imageItem: ManifestItem = { id: 'cover', href: 'cover.gif', mediaType: 'image/gif', properties: [], loc: LOC }
+    const pdfWithFallback: ManifestItem = { ...pdfItem, fallback: 'cover' }
+    const fallbackPkg = validPkg2({ manifest: [ncxItem, contentItem, pdfWithFallback, imageItem], spine: [contentRef, pdfRef] })
+    const fallbackContainer = emptyContainer(['EPUB/toc.ncx', 'EPUB/content.xhtml', 'EPUB/doc.pdf', 'EPUB/cover.gif'])
+    expect(ids(validateOpf(fallbackPkg, fallbackContainer, '2.0'))).toContain('OPF-044')
+  })
+
+  it('OPF-040: fallback idref not found (any version)', () => {
+    const ghostFallbackItem: ManifestItem = { id: 'pdf', href: 'doc.pdf', mediaType: 'application/pdf', properties: [], loc: LOC, fallback: 'ghost' }
+    for (const version of ['2.0', '3.3'] as const) {
+      const pkg = validPkg2({ manifest: [ncxItem, contentItem, ghostFallbackItem], version })
+      const container = emptyContainer(['EPUB/toc.ncx', 'EPUB/content.xhtml', 'EPUB/doc.pdf'])
+      expect(ids(validateOpf(pkg, container, version))).toContain('OPF-040')
+    }
+  })
+
+  it('OPF-099: manifest lists the package document (any version)', () => {
+    const selfItem: ManifestItem = { id: 'self', href: 'package.opf', mediaType: 'application/oebps-package+xml', properties: [], loc: LOC }
+    for (const version of ['2.0', '3.3'] as const) {
+      const pkg = validPkg2({ manifest: [ncxItem, contentItem, selfItem], version })
+      expect(ids(validateOpf(pkg, container2, version))).toContain('OPF-099')
+    }
+  })
+
+  it('RSC-005 / OPF-049 / OPF-050 for the spine toc attribute', () => {
+    const noTocPkg = validPkg2({ spineToc: undefined })
+    expect(
+      validateOpf(noTocPkg, container2, '2.0').some((m) => m.id === 'RSC-005' && m.message.includes('toc attribute')),
+    ).toBe(true)
+
+    const ghostTocPkg = validPkg2({ spineToc: 'ghost' })
+    expect(ids(validateOpf(ghostTocPkg, container2, '2.0'))).toContain('OPF-049')
+
+    const wrongTypeTocPkg = validPkg2({ spineToc: 'content' })
+    expect(ids(validateOpf(wrongTypeTocPkg, container2, '2.0'))).toContain('OPF-050')
+  })
+
+  it('emits none of the EPUB 2 rules for a 3.x target', () => {
+    const imageItem: ManifestItem = { id: 'cover', href: 'cover.gif', mediaType: 'image/gif', properties: [], loc: LOC }
+    const imageRef: SpineItem = { idref: 'cover', linear: true, properties: [], loc: LOC }
+    const htmlItem: ManifestItem = { id: 'html', href: 'html.html', mediaType: 'text/html', properties: [], loc: LOC }
+    const oeb1CssItem: ManifestItem = { id: 'oeb1css', href: 'oeb1.css', mediaType: 'text/x-oeb1-css', properties: [], loc: LOC }
+    const pdfItem: ManifestItem = { id: 'pdf', href: 'doc.pdf', mediaType: 'application/pdf', properties: [], loc: LOC }
+    const pdfRef: SpineItem = { idref: 'pdf', linear: true, properties: [], loc: LOC }
+    const badGuideRef: GuideReference = { type: 'text', href: 'nowhere.xhtml', loc: LOC }
+
+    const pkg = validPkg2({
+      manifest: [ncxItem, contentItem, imageItem, htmlItem, oeb1CssItem, pdfItem],
+      spine: [contentRef, contentRef, imageRef, pdfRef],
+      spineToc: 'content', // wrong media type were this checked at 3.x
+      guide: [badGuideRef],
+    })
+    const container = emptyContainer(['EPUB/toc.ncx', 'EPUB/content.xhtml', 'EPUB/cover.gif', 'EPUB/html.html', 'EPUB/oeb1.css', 'EPUB/doc.pdf'])
+    const out = ids(validateOpf(pkg, container, '3.3'))
+    for (const forbidden of ['OPF-031', 'OPF-032', 'OPF-034', 'OPF-035', 'OPF-037', 'OPF-042', 'OPF-043', 'OPF-044', 'OPF-050']) {
+      expect(out).not.toContain(forbidden)
+    }
   })
 })

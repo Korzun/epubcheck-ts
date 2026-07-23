@@ -28,6 +28,7 @@ function setup(docs: Record<string, string>, extras: string[] = []): { pkg: Pack
     manifest,
     spinePresent: true,
     spine: manifest.map((m) => ({ idref: m.id, linear: true, properties: [], loc: LOC })),
+    guide: [],
     loc: LOC,
   }
   return { pkg, container }
@@ -288,5 +289,38 @@ describe('validateContentDocs — deprecated content elements (RSC-017)', () => 
     const { pkg, container } = setupBody(body)
     expect(validateContentDocs(pkg, container, '3.2').filter((m) => m.id === 'RSC-017').length).toBe(2)
     expect(validateContentDocs(pkg, container, '3.0').some((m) => m.id === 'RSC-017')).toBe(false)
+  })
+})
+
+describe('EPUB 2 gating', () => {
+  const msgIds = (pkg: PackageDocument, container: EpubContainer, version: '2.0' | '3.3') =>
+    validateContentDocs(pkg, container, version).map((m) => m.id)
+
+  it('RSC-006 for a remote audio ref under a 2.0 target (allowed under 3.x)', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<audio src="https://x.example/a.mp3"></audio>' })
+    expect(msgIds(pkg, container, '2.0')).toContain('RSC-006')
+    expect(msgIds(pkg, container, '3.3')).not.toContain('RSC-006')
+  })
+
+  it('no RSC-031 https advice under a 2.0 target', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<blockquote cite="http://x.example/q"></blockquote>' })
+    expect(msgIds(pkg, container, '3.3')).toContain('RSC-031')
+    expect(msgIds(pkg, container, '2.0')).not.toContain('RSC-031')
+  })
+
+  it('RSC-010 blessed set is version-aware: SVG hyperlink target is blessed in 3.x, not 2.0', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<a href="pic.svg">x</a>' })
+    pkg.manifest.push({ id: 'svg', href: 'pic.svg', mediaType: 'image/svg+xml', properties: [], loc: LOC })
+    pkg.spine.push({ idref: 'svg', linear: true, properties: [], loc: LOC })
+    container.resources.set('EPUB/pic.svg', { path: 'EPUB/pic.svg', bytes: enc('x'), compression: 'deflate' })
+    expect(msgIds(pkg, container, '3.3')).not.toContain('RSC-010')
+    expect(msgIds(pkg, container, '2.0')).toContain('RSC-010')
+  })
+
+  it('RSC-032 still fires under a 2.0 target (epubcheck v2 suite expects it)', () => {
+    const { pkg, container } = setup({ 'c1.xhtml': '<img src="chart.bmp"/>' })
+    pkg.manifest.push({ id: 'bmp', href: 'chart.bmp', mediaType: 'image/bmp', properties: [], loc: LOC })
+    container.resources.set('EPUB/chart.bmp', { path: 'EPUB/chart.bmp', bytes: enc('x'), compression: 'deflate' })
+    expect(msgIds(pkg, container, '2.0')).toContain('RSC-032')
   })
 })

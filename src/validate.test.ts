@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { zipSync } from 'fflate'
 import { validateEpub } from './validate.js'
+import { buildEpub2, NCX2, buildEpub, OPF } from '../test/fixtures/build.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 
@@ -192,5 +193,46 @@ describe('validateEpub', () => {
     expect(report.fatal).toBe(true)
     expect(report.valid).toBe(false)
     expect(report.threshold).toBe('ERROR')
+  })
+})
+
+describe('EPUB 2 pipeline', () => {
+  it('a valid EPUB 2 book produces zero messages', async () => {
+    const report = await validateEpub(buildEpub2())
+    expect(report.messages).toEqual([])
+    expect(report.epubVersion).toBe('2.0')
+  })
+
+  it('validates the NCX: uid mismatch → NCX-001', async () => {
+    const epub = buildEpub2({
+      files: { 'EPUB/toc.ncx': NCX2.replace('urn:uuid:00000000-0000-0000-0000-000000000000', 'urn:uuid:mismatch') },
+    })
+    const report = await validateEpub(epub)
+    expect(report.messages.map((m) => m.id)).toContain('NCX-001')
+  })
+
+  it('runs the content layer for EPUB 2: broken hyperlink → RSC-007', async () => {
+    const epub = buildEpub2({
+      files: {
+        'EPUB/content_001.xhtml':
+          '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body><a href="ghost.xhtml">x</a></body></html>',
+      },
+    })
+    const report = await validateEpub(epub)
+    expect(report.messages.map((m) => m.id)).toContain('RSC-007')
+  })
+
+  it('validates a legacy NCX in an EPUB 3 book', async () => {
+    const epub = buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace(
+          '</manifest>',
+          '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/></manifest>',
+        ),
+        'EPUB/toc.ncx': NCX2.replace('urn:uuid:00000000-0000-0000-0000-000000000000', 'urn:uuid:mismatch'),
+      },
+    })
+    const report = await validateEpub(epub)
+    expect(report.messages.map((m) => m.id)).toContain('NCX-001')
   })
 })

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { EpubContainer, Resource } from '../io/zip.js'
-import { parseOpf } from './opf.js'
+import { parseOpf, hasFallbackTo, type ManifestItem } from './opf.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 
@@ -94,6 +94,59 @@ describe('parseOpf', () => {
   })
 })
 
+describe('guide and spine toc parsing', () => {
+  it('captures guide references and the spine toc attribute', () => {
+    const { pkg } = parseOpf(
+      container(
+        PKG(
+          META +
+            '<manifest><item id="content" href="content.xhtml" media-type="application/xhtml+xml"/></manifest>' +
+            '<spine toc="ncx"><itemref idref="content"/></spine>' +
+            '<guide><reference type="text" title="Start" href="content.xhtml"/></guide>',
+        ),
+      ),
+    )
+    expect(pkg?.spineToc).toBe('ncx')
+    expect(pkg?.spineLoc).toBeDefined()
+    expect(pkg?.guide).toHaveLength(1)
+    expect(pkg?.guide[0]).toMatchObject({ type: 'text', title: 'Start', href: 'content.xhtml' })
+  })
+
+  it('yields an empty guide and undefined spineToc when absent', () => {
+    const { pkg } = parseOpf(
+      container(
+        PKG(
+          META +
+            '<manifest><item id="content" href="content.xhtml" media-type="application/xhtml+xml"/></manifest>' +
+            '<spine><itemref idref="content"/></spine>',
+        ),
+      ),
+    )
+    expect(pkg?.guide).toEqual([])
+    expect(pkg?.spineToc).toBeUndefined()
+  })
+})
+
+describe('hasFallbackTo', () => {
+  const item = (id: string, mediaType: string, fallback?: string): ManifestItem =>
+    ({ id, href: `${id}.bin`, mediaType, properties: [], fallback, loc: { path: 'p.opf' } })
+
+  it('walks the chain to a matching item', () => {
+    const a = item('a', 'application/pdf', 'b')
+    const b = item('b', 'application/xhtml+xml')
+    const byId = new Map([['a', a], ['b', b]])
+    expect(hasFallbackTo(a, byId, (i) => i.mediaType === 'application/xhtml+xml')).toBe(true)
+  })
+
+  it('is cycle-safe and returns false on a dangling id', () => {
+    const a = item('a', 'application/pdf', 'b')
+    const b = item('b', 'application/pdf', 'a')
+    const byId = new Map([['a', a], ['b', b]])
+    expect(hasFallbackTo(a, byId, () => false)).toBe(false)
+    expect(hasFallbackTo(item('c', 'x/y', 'nope'), byId, () => true)).toBe(false)
+  })
+})
+
 import { manifestPathMap } from './opf.js'
 
 describe('manifestPathMap', () => {
@@ -106,7 +159,7 @@ describe('manifestPathMap', () => {
         { id: 'a', href: 'x/a.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc },
         { id: 'r', href: 'https://example.com/r.png', mediaType: 'image/png', properties: [], loc },
       ],
-      spinePresent: true, spine: [], loc,
+      spinePresent: true, spine: [], guide: [], loc,
     }
     const map = manifestPathMap(pkg)
     expect(map.get('EPUB/x/a.xhtml')?.id).toBe('a')

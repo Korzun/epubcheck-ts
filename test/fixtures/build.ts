@@ -44,14 +44,8 @@ export interface EpubOverrides {
   mimetypeDeflate?: boolean
 }
 
-export function buildEpub(o: EpubOverrides = {}): Uint8Array {
-  const base: Record<string, string | Uint8Array> = {
-    mimetype: MIMETYPE,
-    'META-INF/container.xml': CONTAINER,
-    'EPUB/package.opf': OPF,
-    'EPUB/nav.xhtml': NAV,
-    'EPUB/content_001.xhtml': CONTENT,
-  }
+/** Merge a baseline file set with overrides and zip it (mimetype stored, rest deflated). */
+function assembleEpub(base: Record<string, string | Uint8Array>, o: EpubOverrides): Uint8Array {
   const merged: Record<string, string | Uint8Array> = { ...base, ...(o.files ?? {}) }
   for (const k of o.omit ?? []) delete merged[k]
 
@@ -61,6 +55,60 @@ export function buildEpub(o: EpubOverrides = {}): Uint8Array {
     entries[path] = [typeof content === 'string' ? enc(content) : content, { level }]
   }
   return zipSync(entries)
+}
+
+export function buildEpub(o: EpubOverrides = {}): Uint8Array {
+  return assembleEpub(
+    {
+      mimetype: MIMETYPE,
+      'META-INF/container.xml': CONTAINER,
+      'EPUB/package.opf': OPF,
+      'EPUB/nav.xhtml': NAV,
+      'EPUB/content_001.xhtml': CONTENT,
+    },
+    o,
+  )
+}
+
+// A fully-valid EPUB 2 (OPF 2.0 + NCX) package. Substrings below are stable
+// targets for fixture .replace() edits.
+export const OPF2 =
+  '<package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0" unique-identifier="uid">' +
+  '<metadata>' +
+  '<dc:identifier id="uid">urn:uuid:00000000-0000-0000-0000-000000000000</dc:identifier>' +
+  '<dc:title>Title</dc:title>' +
+  '<dc:language>en</dc:language>' +
+  '</metadata>' +
+  '<manifest>' +
+  '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>' +
+  '<item id="content" href="content_001.xhtml" media-type="application/xhtml+xml"/>' +
+  '</manifest>' +
+  '<spine toc="ncx"><itemref idref="content"/></spine>' +
+  '<guide><reference type="text" title="Text" href="content_001.xhtml"/></guide>' +
+  '</package>'
+
+export const NCX2 =
+  '<?xml version="1.0" encoding="UTF-8"?>' +
+  '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">' +
+  '<head><meta name="dtb:uid" content="urn:uuid:00000000-0000-0000-0000-000000000000"/></head>' +
+  '<docTitle><text>Title</text></docTitle>' +
+  '<navMap>' +
+  '<navPoint id="np1" playOrder="1"><navLabel><text>Content</text></navLabel><content src="content_001.xhtml"/></navPoint>' +
+  '</navMap>' +
+  '</ncx>'
+
+/** Build an EPUB 2 publication (OPF 2.0 + NCX baseline). */
+export function buildEpub2(o: EpubOverrides = {}): Uint8Array {
+  return assembleEpub(
+    {
+      mimetype: MIMETYPE,
+      'META-INF/container.xml': CONTAINER,
+      'EPUB/package.opf': OPF2,
+      'EPUB/toc.ncx': NCX2,
+      'EPUB/content_001.xhtml': CONTENT,
+    },
+    o,
+  )
 }
 
 /** Build a valid EPUB that links a stylesheet `EPUB/style.css` from the content doc. */

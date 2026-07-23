@@ -1,13 +1,15 @@
 import { openEpub } from './io/zip.js'
 import { validateOcf } from './checks/ocf.js'
-import { parseOpf } from './parse/opf.js'
+import { parseOpf, type ManifestItem } from './parse/opf.js'
 import { validateOpf, checkUndeclaredResources } from './checks/opf.js'
 import { parseNav } from './parse/nav.js'
 import { validateNav } from './checks/nav.js'
+import { parseNcx } from './parse/ncx.js'
+import { validateNcx } from './checks/ncx.js'
 import { validateContentDocs } from './checks/content.js'
 import { validateCssDocs } from './checks/css.js'
 import { buildReport, type Report, type ValidationThreshold } from './report.js'
-import { majorVersion, type EpubVersion } from './versions.js'
+import { majorVersion, NCX_MEDIA_TYPE, type EpubVersion } from './versions.js'
 import { msg, type Message } from './messages/format.js'
 
 export interface ValidateOptions {
@@ -58,16 +60,40 @@ export async function validateEpub(
         messages.push(msg('PKG-001', pkg.loc, options.version, pkg.version ?? ''))
       }
 
-      // EPUB 3 layered documents (nav, content, css).
-      if (target !== undefined && majorVersion(target) === '3.0') {
-        const navItem = pkg.manifest.find((i) => i.properties.includes('nav'))
-        if (navItem) {
-          const { nav, messages: navMessages } = parseNav(navItem, container)
-          messages.push(...navMessages)
-          if (nav) messages.push(...validateNav(nav, pkg, container))
+      if (target !== undefined) {
+        // NCX: EPUB 2's navigation document; also validated as a legacy compat
+        // doc when an EPUB 3 book ships one. Found via the spine toc idref,
+        // falling back to media-type discovery.
+        const byId = new Map<string, ManifestItem>()
+        for (const item of pkg.manifest) {
+          if (item.id !== undefined) byId.set(item.id, item)
         }
+        // The spine toc idref locates the NCX regardless of its media type
+        // (epubcheck parity): if it points at a non-NCX item, that item is still
+        // parsed as the NCX (surfacing a structural RSC-005) and OPF-050 is
+        // reported separately by validateOpf. Do not media-type-gate this lookup.
+        const ncxItem =
+          (pkg.spineToc !== undefined ? byId.get(pkg.spineToc) : undefined) ??
+          pkg.manifest.find((i) => i.mediaType === NCX_MEDIA_TYPE)
+        if (ncxItem) {
+          const { ncx, messages: ncxMessages } = parseNcx(ncxItem, container)
+          messages.push(...ncxMessages)
+          if (ncx) messages.push(...validateNcx(ncx, pkg, container, target))
+        }
+
+        // EPUB 3 navigation document.
+        if (majorVersion(target) === '3.0') {
+          const navItem = pkg.manifest.find((i) => i.properties.includes('nav'))
+          if (navItem) {
+            const { nav, messages: navMessages } = parseNav(navItem, container)
+            messages.push(...navMessages)
+            if (nav) messages.push(...validateNav(nav, pkg, container))
+          }
+        }
+
+        // Content and CSS layers run for both majors, version-gated internally.
         messages.push(...validateContentDocs(pkg, container, target))
-        messages.push(...validateCssDocs(pkg, container))
+        messages.push(...validateCssDocs(pkg, container, target))
       }
     }
 

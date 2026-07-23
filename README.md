@@ -40,10 +40,15 @@ vocabulary, so their output is broadly compatible.
 
 ## Features
 
-- **EPUB 2 and EPUB 3** — the package document only distinguishes the major
-  version (`2.0` or `3.0`); all published revisions (`2.0`, `2.0.1`, `3.0`,
-  `3.0.1`, `3.2`, `3.3`) are accepted as `version` targets and are
-  caller-selected via `options.version`.
+- **EPUB 2 and EPUB 3** — full-pipeline validation for both majors: EPUB 3
+  books get OCF → package → navigation-document → content → CSS checks; EPUB 2
+  books get the same pipeline with the NCX in place of the navigation document,
+  plus OPF 2.0 rules (`<guide>`, spine `toc`/NCX wiring, EPUB 2 blessed media
+  types and fallback chains). An EPUB 3 book that ships a legacy NCX gets it
+  validated too. The package document only distinguishes the major version
+  (`2.0` or `3.0`); all published revisions (`2.0`, `2.0.1`, `3.0`, `3.0.1`,
+  `3.2`, `3.3`) are accepted as `version` targets and are caller-selected via
+  `options.version`.
 - **Runtime-agnostic** — pure functions over byte buffers; no filesystem access.
 - **Layered, functional API** — call the all-in-one `validateEpub`, or compose
   the underlying parse/check functions yourself.
@@ -56,14 +61,15 @@ vocabulary, so their output is broadly compatible.
 
 ### Validation coverage
 
-The current checks span the container, package document, navigation document,
-content documents, and stylesheets:
+The current checks span the container, package document, navigation document
+(EPUB 3) or NCX (EPUB 2), content documents, and stylesheets:
 
 | Area | Message ids |
 | --- | --- |
 | Package / container structure (OCF) | `PKG-*`, `RSC-001`–`RSC-003` |
 | OPF manifest & spine semantics | `OPF-*`, `RSC-005`–`RSC-012` |
 | Navigation document (EPUB 3) | `NAV-*` |
+| NCX (EPUB 2, or a legacy NCX in an EPUB 3 book) | `NCX-*` |
 | CSS / style sheets | `CSS-*` |
 
 ## Installation

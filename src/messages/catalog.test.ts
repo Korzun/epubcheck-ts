@@ -100,6 +100,31 @@ describe('CATALOG', () => {
     expect(CATALOG['RSC-017']?.severity).toBe('WARNING')
     expect(CATALOG['RSC-017']?.template).toContain('%1$s')
   })
+
+  it('defines EPUB 2 OPF message ids with epubcheck severities', () => {
+    expect(CATALOG['OPF-031']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-032']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-034']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-035']?.severity).toBe('WARNING')
+    expect(CATALOG['OPF-037']?.severity).toBe('WARNING')
+    expect(CATALOG['OPF-040']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-042']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-043']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-044']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-050']?.severity).toBe('ERROR')
+    expect(CATALOG['OPF-099']?.severity).toBe('ERROR')
+  })
+
+  it('defines NCX message ids with epubcheck severities', () => {
+    expect(CATALOG['NCX-001']?.severity).toBe('ERROR')
+    expect(CATALOG['NCX-004']?.severity).toBe('USAGE')
+    expect(CATALOG['NCX-006']?.severity).toBe('USAGE')
+  })
+
+  it('NCX-001 template carries both identifier placeholders', () => {
+    expect(CATALOG['NCX-001']?.template).toContain('%1$s')
+    expect(CATALOG['NCX-001']?.template).toContain('%2$s')
+  })
 })
 
 describe('SEVERITY_RANK', () => {
