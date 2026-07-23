@@ -35,7 +35,18 @@ export const CATALOG: Record<string, { severity: Severity; template: string }> =
   'OPF-001': { severity: 'ERROR', template: 'There was an error when parsing the EPUB version: %1$s' },
   'OPF-003': { severity: 'USAGE', template: 'Item "%1$s" exists in the EPUB, but is not declared in the OPF manifest.' },
   'OPF-030': { severity: 'ERROR', template: 'The unique-identifier "%1$s" was not found.' },
+  'OPF-031': { severity: 'ERROR', template: 'File listed in reference element in guide was not declared in OPF manifest: %1$s.' },
+  'OPF-032': { severity: 'ERROR', template: 'Guide references "%1$s" which is not a valid "OPS Content Document".' },
   'OPF-033': { severity: 'ERROR', template: 'The spine contains no linear resources.' },
+  'OPF-034': { severity: 'ERROR', template: 'The spine contains multiple references to the manifest item with id "%1$s".' },
+  'OPF-035': { severity: 'WARNING', template: 'Media type "text/html" is not appropriate for XHTML/OPS.' },
+  'OPF-037': { severity: 'WARNING', template: 'Found deprecated media-type "%1$s".' },
+  'OPF-040': { severity: 'ERROR', template: 'Fallback item with id "%1$s" could not be found.' },
+  'OPF-042': { severity: 'ERROR', template: '"%1$s" is not a permissible spine media-type.' },
+  'OPF-043': { severity: 'ERROR', template: 'Spine item with non-standard media-type "%1$s" has no fallback.' },
+  'OPF-044': { severity: 'ERROR', template: 'Spine item with non-standard media-type "%1$s" has no EPUB content document fallback.' },
+  'OPF-050': { severity: 'ERROR', template: 'TOC attribute references resource with non-NCX mime type; "application/x-dtbncx+xml" is expected.' },
+  'OPF-099': { severity: 'ERROR', template: 'The manifest must not list the package document.' },
   'OPF-048': { severity: 'ERROR', template: 'Package tag is missing its required unique-identifier attribute and value.' },
   'OPF-049': { severity: 'ERROR', template: 'Item id "%1$s" was not found in the manifest.' },
   'OPF-074': { severity: 'ERROR', template: 'Package resource "%1$s" is declared in several manifest item.' },
@@ -43,6 +54,10 @@ export const CATALOG: Record<string, { severity: Severity; template: string }> =
   // Navigation
   'NAV-010': { severity: 'ERROR', template: '"%1$s" nav must not link to remote resources; found link to "%2$s".' },
   'NAV-011': { severity: 'WARNING', template: '"%1$s" nav must be in reading order; link target "%2$s" is before the previous link\'s target in %3$s order.' },
+  // NCX (EPUB 2 navigation)
+  'NCX-001': { severity: 'ERROR', template: 'NCX identifier ("%1$s") does not match OPF identifier ("%2$s").' },
+  'NCX-004': { severity: 'USAGE', template: 'NCX identifier ("dtb:uid" metadata) should not contain leading or trailing whitespace.' },
+  'NCX-006': { severity: 'USAGE', template: 'Empty "text" label in the NCX document' },
   // Internal
   'CHK-001': { severity: 'FATAL', template: 'An internal error occurred while validating: %1$s' },
   // CSS
