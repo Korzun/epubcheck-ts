@@ -1394,13 +1394,24 @@ export const NCX2 =
 
 /** Build an EPUB 2 publication (OPF 2.0 + NCX baseline). */
 export function buildEpub2(o: EpubOverrides = {}): Uint8Array {
-  const base: Record<string, string | Uint8Array> = {
-    mimetype: MIMETYPE,
-    'META-INF/container.xml': CONTAINER,
-    'EPUB/package.opf': OPF2,
-    'EPUB/toc.ncx': NCX2,
-    'EPUB/content_001.xhtml': CONTENT,
-  }
+  return assembleEpub(
+    {
+      mimetype: MIMETYPE,
+      'META-INF/container.xml': CONTAINER,
+      'EPUB/package.opf': OPF2,
+      'EPUB/toc.ncx': NCX2,
+      'EPUB/content_001.xhtml': CONTENT,
+    },
+    o,
+  )
+}
+```
+
+To avoid duplicating the zip-assembly logic, extract a shared private helper and refactor `buildEpub` to use it (behavior identical — all existing fixtures/tests must still pass). Add this helper ABOVE `buildEpub`:
+
+```ts
+/** Merge a baseline file set with overrides and zip it (mimetype stored, rest deflated). */
+function assembleEpub(base: Record<string, string | Uint8Array>, o: EpubOverrides): Uint8Array {
   const merged: Record<string, string | Uint8Array> = { ...base, ...(o.files ?? {}) }
   for (const k of o.omit ?? []) delete merged[k]
 
@@ -1413,7 +1424,22 @@ export function buildEpub2(o: EpubOverrides = {}): Uint8Array {
 }
 ```
 
-(Deliberate duplication of `buildEpub`'s zip assembly — the two baselines are independent; do NOT refactor `buildEpub` here.)
+and replace the body of the existing `buildEpub` with:
+
+```ts
+export function buildEpub(o: EpubOverrides = {}): Uint8Array {
+  return assembleEpub(
+    {
+      mimetype: MIMETYPE,
+      'META-INF/container.xml': CONTAINER,
+      'EPUB/package.opf': OPF,
+      'EPUB/nav.xhtml': NAV,
+      'EPUB/content_001.xhtml': CONTENT,
+    },
+    o,
+  )
+}
+```
 
 - [ ] **Step 2: Write the failing pipeline tests**
 
