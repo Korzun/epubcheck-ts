@@ -111,3 +111,39 @@ describe('validateCssDocs — font-face type (CSS-007)', () => {
     expect(validateCssDocs(pkg, container).map((m) => m.id)).not.toContain('CSS-007')
   })
 })
+
+describe('CSS-007 version awareness', () => {
+  // @font-face src → declared local item with media-type 'application/x-font-opentype',
+  // blessed under the EPUB 2 prefix predicate but not in the 3.x exact-match set.
+  function setupOpentypeFont(): { pkg: PackageDocument; container: EpubContainer } {
+    const { pkg, container } = setup('@font-face { font-family: F; src: url(f.otf); }')
+    pkg.manifest.push({ id: 'fnt', href: 'f.otf', mediaType: 'application/x-font-opentype', properties: [], loc: LOC })
+    container.resources.set('EPUB/f.otf', { path: 'EPUB/f.otf', bytes: enc('x'), compression: 'deflate' })
+    return { pkg, container }
+  }
+
+  it('v2 prefix predicate accepts application/x-font-opentype (no CSS-007) via validateCssDocs', () => {
+    const { pkg, container } = setupOpentypeFont()
+    expect(validateCssDocs(pkg, container, '2.0').map((m) => m.id)).not.toContain('CSS-007')
+  })
+
+  it('3.x exact set rejects it (CSS-007) via validateCssDocs; default unchanged', () => {
+    const { pkg, container } = setupOpentypeFont()
+    expect(validateCssDocs(pkg, container, '3.3').map((m) => m.id)).toContain('CSS-007')
+    expect(validateCssDocs(pkg, container).map((m) => m.id)).toContain('CSS-007') // default unchanged
+  })
+
+  it('validateCss itself honors the version parameter for CSS-007', () => {
+    const { pkg, container } = setupOpentypeFont()
+    const manifest = manifestPathMap(pkg)
+    const css = {
+      path: 'EPUB/s.css',
+      refs: [{ url: 'f.otf', type: 'font' as const, loc: { path: 'EPUB/s.css' } }],
+      declarations: [],
+      fontFaces: [],
+    }
+    expect(validateCss(css, container, manifest, '2.0').map((m) => m.id)).not.toContain('CSS-007')
+    expect(validateCss(css, container, manifest, '3.3').map((m) => m.id)).toContain('CSS-007')
+    expect(validateCss(css, container, manifest).map((m) => m.id)).toContain('CSS-007') // default unchanged
+  })
+})

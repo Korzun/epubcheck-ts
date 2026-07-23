@@ -3,24 +3,30 @@ import { manifestPathMap, type ManifestItem, type PackageDocument } from '../par
 import { getResource, type EpubContainer } from '../io/zip.js'
 import { resolvePath, isRemote, hasScheme } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
-import { isBlessedFontType } from '../util/media-types.js'
+import { isBlessedFontType, isBlessedFontMimetype20 } from '../util/media-types.js'
+import { majorVersion, type EpubVersion } from '../versions.js'
 
 export function validateCss(
   css: CssDocument,
   container: EpubContainer,
   manifest: Map<string, ManifestItem>,
+  version?: EpubVersion,
 ): Message[] {
-  return [...checkReferences(css, container, manifest), ...checkProperties(css)]
+  return [...checkReferences(css, container, manifest, version), ...checkProperties(css)]
 }
 
-export function validateCssDocs(pkg: PackageDocument, container: EpubContainer): Message[] {
+export function validateCssDocs(
+  pkg: PackageDocument,
+  container: EpubContainer,
+  version?: EpubVersion,
+): Message[] {
   const messages: Message[] = []
   const manifest = manifestPathMap(pkg)
   for (const item of pkg.manifest) {
     if (item.mediaType !== 'text/css') continue
     const { css, messages: m } = parseCss(item, container)
     messages.push(...m)
-    if (css) messages.push(...validateCss(css, container, manifest))
+    if (css) messages.push(...validateCss(css, container, manifest, version))
   }
   return messages
 }
@@ -44,8 +50,11 @@ function checkReferences(
   css: CssDocument,
   container: EpubContainer,
   manifest: Map<string, ManifestItem>,
+  version?: EpubVersion,
 ): Message[] {
   const messages: Message[] = []
+  const isBlessedFont =
+    version !== undefined && majorVersion(version) === '2.0' ? isBlessedFontMimetype20 : isBlessedFontType
   for (const ref of css.refs) {
     const url = ref.url
 
@@ -73,7 +82,7 @@ function checkReferences(
       messages.push(msg('RSC-008', ref.loc, url))
     } else if (ref.type === 'font') {
       const item = manifest.get(target)
-      if (item && item.mediaType !== undefined && !isBlessedFontType(item.mediaType)) {
+      if (item && item.mediaType !== undefined && !isBlessedFont(item.mediaType)) {
         messages.push(msg('CSS-007', ref.loc, url, item.mediaType))
       }
     }

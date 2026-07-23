@@ -63,6 +63,7 @@ export function validateContentDocs(
           { path: doc.path, refs: a.refs, declarations: a.declarations, fontFaces: a.fontFaces },
           container,
           manifest,
+          version,
         ),
       )
     }
