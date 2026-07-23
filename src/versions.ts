@@ -52,3 +52,39 @@ export function coreMediaTypes(v: EpubVersion): ReadonlySet<string> {
   }
   return set
 }
+
+/** NCX media type — the EPUB 2 navigation document (also valid as an EPUB 3 legacy compat doc). */
+export const NCX_MEDIA_TYPE = 'application/x-dtbncx+xml'
+
+/** EPUB 2 blessed image types (epubcheck OPFChecker.isBlessedImageType, VERSION_2). */
+export const EPUB2_IMAGE_TYPES: ReadonlySet<string> = new Set<string>([
+  'image/gif',
+  'image/png',
+  'image/jpeg',
+  'image/svg+xml',
+])
+
+/** EPUB 2 style types: blessed + deprecated-blessed (epubcheck isBlessedStyleType / isDeprecatedBlessedStyleType). */
+export const EPUB2_STYLE_TYPES: ReadonlySet<string> = new Set<string>([
+  'text/css',
+  'text/x-oeb1-css',
+])
+
+// Blessed content-document types per major (epubcheck isBlessedItemType + isDeprecatedBlessedItemType).
+const BLESSED_CONTENT_V2: ReadonlySet<string> = new Set<string>([
+  'application/xhtml+xml',
+  'application/x-dtbook+xml',
+  'text/x-oeb1-document', // deprecated-blessed
+  'text/html', // deprecated-blessed
+])
+const BLESSED_CONTENT_V3: ReadonlySet<string> = new Set<string>([
+  'application/xhtml+xml',
+  'image/svg+xml',
+  'text/x-oeb1-document', // deprecated-blessed
+  'text/html', // deprecated-blessed
+])
+
+/** Content-document types acceptable as hyperlink/guide/spine targets for a revision. */
+export function blessedContentTypes(v: EpubVersion): ReadonlySet<string> {
+  return majorVersion(v) === '2.0' ? BLESSED_CONTENT_V2 : BLESSED_CONTENT_V3
+}
