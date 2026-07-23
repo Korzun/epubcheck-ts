@@ -23,7 +23,7 @@ function navDoc(body: string, targets: string[] = ['EPUB/c1.xhtml']): { nav: Nav
     path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
     metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
     manifest: [navItem, { id: 'c1', href: 'c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }],
-    spinePresent: true, spine: [{ idref: 'c1', linear: true, properties: [], loc: LOC }], loc: LOC,
+    spinePresent: true, spine: [{ idref: 'c1', linear: true, properties: [], loc: LOC }], guide: [], loc: LOC,
   }
   return { nav: nav!, pkg, container }
 }
@@ -124,6 +124,7 @@ describe('validateNav — reading order (NAV-011)', () => {
         { idref: 'c1', linear: true, properties: [], loc: LOC },
         { idref: 'c2', linear: true, properties: [], loc: LOC },
       ],
+      guide: [],
       loc: LOC,
     }
     return validateNav(nav!, pkg, container).map((m) => m.id)
@@ -164,7 +165,7 @@ describe('validateNav — reading order document sub-case (NAV-011)', () => {
       path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
       metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
       manifest: [navItem, { id: 'c1', href: 'c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }],
-      spinePresent: true, spine: [{ idref: 'c1', linear: true, properties: [], loc: LOC }], loc: LOC,
+      spinePresent: true, spine: [{ idref: 'c1', linear: true, properties: [], loc: LOC }], guide: [], loc: LOC,
     }
     return validateNav(nav!, pkg, container).map((m) => m.id)
   }

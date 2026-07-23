@@ -18,7 +18,7 @@ function setup(css: string, opts: { present?: string[]; declared?: string[] } = 
   const pkg: PackageDocument = {
     path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
     metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
-    manifest, spinePresent: true, spine: [], loc: LOC,
+    manifest, spinePresent: true, spine: [], guide: [], loc: LOC,
   }
   return { pkg, container }
 }

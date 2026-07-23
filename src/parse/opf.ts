@@ -29,6 +29,12 @@ export interface SpineItem {
   properties: string[]
   loc: Location
 }
+export interface GuideReference {
+  type?: string
+  title?: string
+  href?: string
+  loc: Location
+}
 export interface PackageDocument {
   path: string
   version?: string
@@ -37,6 +43,11 @@ export interface PackageDocument {
   manifest: ManifestItem[]
   spinePresent: boolean
   spine: SpineItem[]
+  /** <spine toc="…"> idref (EPUB 2 NCX pointer); undefined when absent. */
+  spineToc?: string
+  /** Location of the <spine> element (for RSC-005 on a missing toc attribute). */
+  spineLoc?: Location
+  guide: GuideReference[]
   bindings?: Location
   loc: Location
 }
@@ -75,6 +86,7 @@ export function parseOpf(container: EpubContainer): { pkg?: PackageDocument; mes
   const manifestEl = firstChild(root, 'manifest')
   const spineEl = firstChild(root, 'spine')
   const bindingsEl = firstChild(root, 'bindings')
+  const guideEl = firstChild(root, 'guide')
 
   const metadata: Metadata = { identifiers: [], titles: [], languages: [], modifiedCount: 0 }
   if (metadataEl) {
@@ -119,6 +131,17 @@ export function parseOpf(container: EpubContainer): { pkg?: PackageDocument; mes
         }))
     : []
 
+  const guide: GuideReference[] = guideEl
+    ? childElements(guideEl)
+        .filter((el) => el.name === 'reference')
+        .map((el) => ({
+          type: el.attrs?.['type'],
+          title: el.attrs?.['title'],
+          href: el.attrs?.['href'],
+          loc: el.loc,
+        }))
+    : []
+
   const pkg: PackageDocument = {
     path: opfPath,
     version: root.attrs?.['version'],
@@ -127,6 +150,9 @@ export function parseOpf(container: EpubContainer): { pkg?: PackageDocument; mes
     manifest,
     spinePresent: spineEl !== undefined,
     spine,
+    spineToc: spineEl?.attrs?.['toc'],
+    spineLoc: spineEl?.loc,
+    guide,
     bindings: bindingsEl?.loc,
     loc: root.loc,
   }
@@ -140,4 +166,25 @@ export function manifestPathMap(pkg: PackageDocument): Map<string, ManifestItem>
     if (item.href && !isRemote(item.href)) map.set(resolvePath(pkg.path, item.href), item)
   }
   return map
+}
+
+/**
+ * Walk the manifest `fallback` chain (each fallback is a manifest item id) and
+ * report whether any item in the chain satisfies the predicate. Cycle-guarded.
+ */
+export function hasFallbackTo(
+  item: ManifestItem,
+  byId: Map<string, ManifestItem>,
+  predicate: (i: ManifestItem) => boolean,
+): boolean {
+  const seen = new Set<string>()
+  let current = item.fallback
+  while (current !== undefined && !seen.has(current)) {
+    seen.add(current)
+    const next = byId.get(current)
+    if (next === undefined) return false
+    if (predicate(next)) return true
+    current = next.fallback
+  }
+  return false
 }

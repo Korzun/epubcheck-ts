@@ -25,6 +25,7 @@ function validPkg(overrides: Partial<PackageDocument> = {}): PackageDocument {
     manifest: [navItem],
     spinePresent: true,
     spine: [spineItem],
+    guide: [],
     loc: LOC,
     ...overrides,
   }
@@ -151,7 +152,7 @@ describe('checkUndeclaredResources', () => {
       path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
       metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
       manifest: [{ id: 'nav', href: 'nav.xhtml', mediaType: 'application/xhtml+xml', properties: ['nav'], loc: LOC2 }],
-      spinePresent: true, spine: [], loc: LOC2,
+      spinePresent: true, spine: [], guide: [], loc: LOC2,
     }
   }
   function containerWith(paths: string[]): EpubContainer {

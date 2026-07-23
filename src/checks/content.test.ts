@@ -28,6 +28,7 @@ function setup(docs: Record<string, string>, extras: string[] = []): { pkg: Pack
     manifest,
     spinePresent: true,
     spine: manifest.map((m) => ({ idref: m.id, linear: true, properties: [], loc: LOC })),
+    guide: [],
     loc: LOC,
   }
   return { pkg, container }

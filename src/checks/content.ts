@@ -2,7 +2,7 @@ import { parseContent, type ContentDocument, type RefType } from '../parse/conte
 import { getResource, type EpubContainer } from '../io/zip.js'
 import { resolvePath, isRemote, hasScheme } from '../util/path.js'
 import { msg, type Message } from '../messages/format.js'
-import { manifestPathMap, type ManifestItem, type PackageDocument } from '../parse/opf.js'
+import { manifestPathMap, hasFallbackTo, type ManifestItem, type PackageDocument } from '../parse/opf.js'
 import { findDescendants, type XmlNode } from '../io/xml.js'
 import { isKnownHtmlElement } from '../util/html-elements.js'
 import { analyzeCss } from '../parse/css.js'
@@ -23,25 +23,6 @@ const BLESSED_CONTENT_TYPES: ReadonlySet<string> = new Set<string>([
 
 function isBlessedContentType(mediaType: string | undefined): boolean {
   return mediaType !== undefined && BLESSED_CONTENT_TYPES.has(mediaType)
-}
-
-// Walk the manifest `fallback` chain (each fallback is a manifest item id) and
-// report whether any item in the chain satisfies the predicate. Cycle-guarded.
-function hasFallbackTo(
-  item: ManifestItem,
-  byId: Map<string, ManifestItem>,
-  predicate: (i: ManifestItem) => boolean,
-): boolean {
-  const seen = new Set<string>()
-  let current = item.fallback
-  while (current !== undefined && !seen.has(current)) {
-    seen.add(current)
-    const next = byId.get(current)
-    if (next === undefined) return false
-    if (predicate(next)) return true
-    current = next.fallback
-  }
-  return false
 }
 
 function hasFallbackToBlessed(item: ManifestItem, byId: Map<string, ManifestItem>): boolean {
