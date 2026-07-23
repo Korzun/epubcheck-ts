@@ -49,6 +49,10 @@ vocabulary, so their output is broadly compatible.
   (`2.0` or `3.0`); all published revisions (`2.0`, `2.0.1`, `3.0`, `3.0.1`,
   `3.2`, `3.3`) are accepted as `version` targets and are caller-selected via
   `options.version`.
+- **Revision-aware rules** — checks that differ between revisions follow the
+  resolved target: core media types, the `<bindings>` deprecation (`RSC-017`,
+  EPUB 3.2+), `epub:switch` / `epub:trigger` deprecation, and EPUB 2 vs EPUB 3
+  font handling in CSS.
 - **Runtime-agnostic** — pure functions over byte buffers; no filesystem access.
 - **Layered, functional API** — call the all-in-one `validateEpub`, or compose
   the underlying parse/check functions yourself.
@@ -67,10 +71,11 @@ The current checks span the container, package document, navigation document
 | Area | Message ids |
 | --- | --- |
 | Package / container structure (OCF) | `PKG-*`, `RSC-001`–`RSC-003` |
-| OPF manifest & spine semantics | `OPF-*`, `RSC-005`–`RSC-012` |
-| Navigation document (EPUB 3) | `NAV-*` |
-| NCX (EPUB 2, or a legacy NCX in an EPUB 3 book) | `NCX-*` |
-| CSS / style sheets | `CSS-*` |
+| OPF manifest & spine semantics | `OPF-*`, `RSC-005`, `RSC-017` |
+| Navigation document (EPUB 3) | `NAV-*`, `RSC-005` |
+| NCX (EPUB 2, or a legacy NCX in an EPUB 3 book) | `NCX-*`, `RSC-005`–`RSC-012` |
+| Content documents (XHTML / SVG) | `RSC-005`–`RSC-012`, `RSC-017`, `RSC-031`, `RSC-032`, `CSS-005`, `CSS-015` |
+| CSS / style sheets | `CSS-*`, `RSC-006`–`RSC-008`, `RSC-013`, `RSC-030`, `RSC-031` |
 
 ## Installation
 
@@ -114,6 +119,9 @@ const { validateEpub } = require('@korzun/epubcheck-ts')
 // Force validation against a specific revision (e.g. '3.2' or '3.3'). If the
 // detected major version differs, a PKG-001 warning is reported.
 await validateEpub(bytes, { version: '3.2' })
+
+// Choose the severity at which a book counts as invalid (default 'ERROR').
+await validateEpub(bytes, { threshold: ValidationThreshold.WARNING })
 ```
 
 When no `version` is given, EPUB 3 files are validated against the newest
@@ -121,15 +129,22 @@ revision (`3.3`) and EPUB 2 against `2.0`. `report.epubVersion` is the
 revision whose rules were applied (the target), not necessarily the file's
 declared major.
 
+`threshold` is the least-severe level that still marks a report invalid:
+`NONE` never rejects, `USAGE` rejects on any message at all. It only affects
+`report.valid` — every message is collected and returned regardless.
+`ValidationThreshold` is exported as both named constants and a type, so raw
+strings (`'WARNING'`) type-check too.
+
 ### The report
 
 ```ts
 interface Report {
   messages: Message[]
-  epubVersion?: EpubVersion
+  epubVersion?: EpubVersion       // revision the rules were applied against
   counts: Record<Severity, number> // FATAL | ERROR | WARNING | INFO | USAGE
+  threshold: ValidationThreshold  // the threshold this report was judged at
   fatal: boolean   // any FATAL message present
-  valid: boolean   // no FATAL and no ERROR messages
+  valid: boolean   // no message at or above the threshold (default: ERROR)
 }
 
 interface Message {
@@ -183,13 +198,14 @@ Publishing is automated by
 [`.github/workflows/release.yml`](./.github/workflows/release.yml) and triggered
 by **publishing a GitHub Release**:
 
-1. Bump `version` in `package.json` and commit it to `main`.
-2. Create a GitHub Release whose tag matches that version, prefixed with `v`
-   (e.g. version `1.2.0` → tag `v1.2.0`). The workflow fails the publish if the
-   tag and `package.json` version disagree.
+1. Bump `version` in `package.json` (and the two `version` fields in
+   `package-lock.json`) and land it on `main` via a PR — `main` is protected.
+2. Create a GitHub Release whose tag matches that version (e.g. version `1.2.0`
+   → tag `1.2.0`; a leading `v` is tolerated and stripped). The workflow fails
+   the publish if the tag and `package.json` version disagree.
 3. Tick **"Set as a pre-release"** for beta/rc builds. Pre-releases publish
-   under the `next` dist-tag (`npm install @korzun/epubcheck-ts@next`); stable
-   releases publish under `latest`.
+   under the `beta` dist-tag (`npm install @korzun/epubcheck-ts@beta`) so they
+   never become the default install; stable releases publish under `latest`.
 
 Authentication uses npm [Trusted Publishing](https://docs.npmjs.com/trusted-publishers)
 (OIDC) — there is no `NPM_TOKEN` secret, and build provenance is attached
