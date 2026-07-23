@@ -99,6 +99,7 @@ precedent):
 | `OPF-043` | ERROR | spine item with non-blessed media type and no fallback |
 | `OPF-044` | ERROR | spine item whose fallback chain never reaches a blessed content document — reuses the cycle-guarded `hasFallbackTo` walker |
 | `OPF-049` | ERROR | spine `toc` idref not in the manifest (same ID epubcheck uses for itemref; `OPFHandler.java:591`) |
+| `OPF-040` | ERROR | manifest item `fallback` idref not found in the manifest — **version-agnostic** (epubcheck `FallbackChainResolver` runs for both majors; added after verification surfaced it in the v2 test suite) |
 | `OPF-050` | ERROR | spine `toc` idref resolves to a manifest item whose media type isn't `application/x-dtbncx+xml` (`OPFHandler.java:908-911`) |
 | `RSC-005` | ERROR | spine missing the `toc` attribute (required by the OPF 2.0 schema) |
 | `OPF-099` | ERROR | manifest lists the package document itself — **version-agnostic** (epubcheck fires it for both majors) |
@@ -125,8 +126,8 @@ OPF and content checks.
 | `RSC-007`/`RSC-008`/`RSC-012` | unchanged — version-agnostic |
 | `RSC-010` | runs with the EPUB 2 blessed-content set (XHTML, DTBook, deprecated types; **not** SVG — not a content doc in EPUB 2; verify exact epubcheck v2 set during planning) |
 | `RSC-011` | unchanged |
-| `RSC-032` | **gated to 3.0+** — EPUB 2 handles fallbacks at the OPF level (OPF-043/044), not per-reference |
-| `RSC-006` | **new, 2.0-only**: remote resource reference (ERROR) — EPUB 2 forbids remote resources outright, no audio/video exemption. `RSC-031` (https advice) becomes 3.0-only. Verify exact epubcheck v2 scope during planning. |
+| `RSC-032` | **runs for v2 too** (verified: epubcheck's EPUB 2 suite expects it — `opf-fallback-non-resolving-error` → OPF-040 + RSC-032; `checkFallbacks` has no version gate and keys off the EPUB 3 core list even under v2). Stays as-is, using `coreMediaTypes(target)` — for a 2.0 target that yields the 3.0 base list, matching epubcheck modulo the project's existing per-revision webp/ecmascript gating. |
+| `RSC-006` | **new, 2.0-only**: remote resource reference (ERROR). Verified scope (`ResourceReferencesChecker.checkRemoteReference`): fires for every remote reference type except hyperlink/cite/link; the EPUB 3 audio/video/font exemptions don't apply under v2. `RSC-031` (https advice) is v3-only (verified: explicit `version == VERSION_3` guard). |
 | `epub:switch`/`trigger`, bindings | already gated `atLeast(v, '3.2')` — unaffected |
 
 **`checks/css.ts`** — runs as-is for EPUB 2 (CSS rules are version-agnostic in
@@ -158,14 +159,28 @@ including the regression case that an EPUB 2 book does **not** get the
 
 TDD throughout, per the project's standard workflow.
 
-## Verify-during-planning items
+## Verify-during-planning items — RESOLVED
 
-Collected from the sections above; each is resolved by reading epubcheck
-source before the implementation plan is finalized:
+All four resolved against w3c/epubcheck main source during planning:
 
-1. Does epubcheck fire `RSC-011` for NCX `content@src` targets not in the
-   spine?
-2. The exact epubcheck v2 blessed set for `RSC-010` (hyperlink targets).
-3. The exact epubcheck v2 scope of `RSC-006` (which reference kinds trigger
-   it).
-4. `CSS-007` blessed-font behavior under v2.
+1. **RSC-011 for NCX targets: YES.** `NCXHandler` registers `content@src` as
+   `Reference.Type.HYPERLINK`, so NCX links get the full hyperlink checks
+   (RSC-007/008/010/011/012). The v2 feature suite confirms
+   (`ncx-link-to-non-ops-error` → RSC-010, `ncx-missing-resource-error` →
+   RSC-007). NCX links do NOT get the NAV-011 reading-order check (that is
+   `NAV_TOC_LINK`-typed, EPUB 3 nav only).
+2. **RSC-010 v2 blessed set:** `isBlessedItemType(v2)` =
+   `application/xhtml+xml`, `application/x-dtbook+xml`; plus deprecated
+   `text/x-oeb1-document`, `text/html`; plus content-document fallback. (SVG is
+   v3-only, confirmed.)
+3. **RSC-006 v2 scope:** every remote reference type except
+   hyperlink/cite/link. RSC-031 is v3-only.
+4. **CSS-007 under v2:** uses `OPFChecker.isBlessedFontMimetype20` — a prefix
+   predicate (`font/*`, `application/font*`, `application/x-font*`, or exactly
+   `application/vnd.ms-opentype`) instead of the 3.x exact-match set. Requires
+   threading the version into `validateCss`/`validateCssDocs` (as a new
+   optional trailing parameter — additive, non-breaking).
+
+Additional verified details folded into the sections above: RSC-032 ungated
+(runs for v2), OPF-040 added, OPF-032 checks the blessed set only (no fallback
+walk), OPF-035 is scoped to `text/html` and OPF-037 to the two `x-oeb1` types.
