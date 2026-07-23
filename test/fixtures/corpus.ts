@@ -1,5 +1,5 @@
 import type { Severity } from '../../src/index.js'
-import { buildEpub, cssEpub, CONTAINER, OPF, NAV, CONTENT } from './build.js'
+import { buildEpub, buildEpub2, cssEpub, CONTAINER, OPF, OPF2, NAV, NCX2, CONTENT } from './build.js'
 
 export interface Expected {
   id: string
@@ -7,7 +7,7 @@ export interface Expected {
 }
 export interface Fixture {
   name: string
-  area: 'ocf' | 'opf' | 'nav' | 'content' | 'css'
+  area: 'ocf' | 'opf' | 'nav' | 'content' | 'css' | 'ncx'
   description: string
   epub: Uint8Array
   expected: Expected[]
@@ -566,5 +566,227 @@ export const CORPUS: Fixture[] = [
     description: 'supplementary: style="" attribute position:fixed (CSS-006, usage)',
     epub: buildEpub({ files: { 'EPUB/content_001.xhtml': CONTENT.replace('<p>Hello</p>', '<p style="position: fixed">x</p>') } }),
     expected: [E('CSS-006', 'USAGE')],
+  },
+
+  // ---- EPUB 2 baseline ----
+  { name: 'minimal-epub2', area: 'ocf', description: 'minimal valid EPUB 2 (OPF 2.0 + NCX)', epub: buildEpub2(), expected: [] },
+
+  // ---- NCX (mirrors epub2/ncx-publication.feature) ----
+  {
+    name: 'ncx-uid-mismatch',
+    area: 'ncx',
+    description: 'dtb:uid does not match the OPF unique identifier (epubcheck NCX-001)',
+    epub: buildEpub2({ files: { 'EPUB/toc.ncx': NCX2.replace('urn:uuid:00000000-0000-0000-0000-000000000000', 'urn:uuid:mismatch') } }),
+    expected: [E('NCX-001', 'ERROR')],
+  },
+  {
+    name: 'ncx-uid-spaces',
+    area: 'ncx',
+    description: 'dtb:uid has leading/trailing whitespace (epubcheck NCX-004, usage; matches after trim so no NCX-001)',
+    epub: buildEpub2({ files: { 'EPUB/toc.ncx': NCX2.replace('content="urn:uuid:00000000-0000-0000-0000-000000000000"', 'content=" urn:uuid:00000000-0000-0000-0000-000000000000 "') } }),
+    expected: [E('NCX-004', 'USAGE')],
+  },
+  {
+    name: 'ncx-label-empty',
+    area: 'ncx',
+    description: 'empty navLabel text (epubcheck NCX-006, usage)',
+    epub: buildEpub2({ files: { 'EPUB/toc.ncx': NCX2.replace('<text>Content</text>', '<text></text>') } }),
+    expected: [E('NCX-006', 'USAGE')],
+  },
+  {
+    name: 'ncx-navmap-missing',
+    area: 'ncx',
+    description: 'NCX without a navMap (schema-level, epubcheck RSC-005)',
+    epub: buildEpub2({ files: { 'EPUB/toc.ncx': NCX2.replace(/<navMap>[\s\S]*<\/navMap>/, '') } }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'ncx-link-missing-resource',
+    area: 'ncx',
+    description: 'navPoint src to a file not in the EPUB (epubcheck RSC-007; mirrors ncx-missing-resource-error)',
+    epub: buildEpub2({ files: { 'EPUB/toc.ncx': NCX2.replace('src="content_001.xhtml"', 'src="ghost.xhtml"') } }),
+    expected: [E('RSC-007', 'ERROR')],
+  },
+  {
+    name: 'ncx-link-non-ops',
+    area: 'ncx',
+    description: 'navPoint src to a non-content-document (epubcheck RSC-010; mirrors ncx-link-to-non-ops-error)',
+    epub: buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2.replace('</manifest>', '<item id="img" href="cover.gif" media-type="image/gif"/></manifest>'),
+        'EPUB/cover.gif': 'GIF89a',
+        'EPUB/toc.ncx': NCX2.replace('src="content_001.xhtml"', 'src="cover.gif"'),
+      },
+    }),
+    expected: [E('RSC-010', 'ERROR')],
+  },
+
+  // ---- OPF 2.0 (mirrors epub2/opf-package-document.feature + opf-publication.feature) ----
+  {
+    name: 'opf2-guide-undeclared',
+    area: 'opf',
+    description: 'guide reference to a file not in the manifest (epubcheck OPF-031)',
+    epub: buildEpub2({ files: { 'EPUB/package.opf': OPF2.replace('href="content_001.xhtml"/></guide>', 'href="ghost.xhtml"/></guide>') } }),
+    expected: [E('OPF-031', 'ERROR')],
+  },
+  {
+    name: 'opf2-guide-non-content',
+    area: 'opf',
+    description: 'guide reference to a non-content-document (epubcheck OPF-032)',
+    epub: buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2
+          .replace('</manifest>', '<item id="img" href="cover.gif" media-type="image/gif"/></manifest>')
+          .replace('href="content_001.xhtml"/></guide>', 'href="cover.gif"/></guide>'),
+        'EPUB/cover.gif': 'GIF89a',
+      },
+    }),
+    expected: [E('OPF-032', 'ERROR')],
+  },
+  {
+    name: 'opf2-spine-duplicate',
+    area: 'opf',
+    description: 'spine references the same manifest item twice (epubcheck OPF-034)',
+    epub: buildEpub2({ files: { 'EPUB/package.opf': OPF2.replace('<itemref idref="content"/>', '<itemref idref="content"/><itemref idref="content"/>') } }),
+    expected: [E('OPF-034', 'ERROR')],
+  },
+  {
+    name: 'opf2-text-html',
+    area: 'opf',
+    description: 'manifest item with text/html media type (epubcheck OPF-035, warning)',
+    epub: buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2.replace('</manifest>', '<item id="html" href="old.html" media-type="text/html"/></manifest>'),
+        'EPUB/old.html': CONTENT,
+      },
+    }),
+    expected: [E('OPF-035', 'WARNING')],
+  },
+  {
+    name: 'opf2-deprecated-type',
+    area: 'opf',
+    description: 'manifest item with deprecated text/x-oeb1-css media type (epubcheck OPF-037, warning)',
+    epub: buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2.replace('</manifest>', '<item id="oeb" href="old.css" media-type="text/x-oeb1-css"/></manifest>'),
+        'EPUB/old.css': 'p { color: black }',
+      },
+    }),
+    expected: [E('OPF-037', 'WARNING')],
+  },
+  {
+    name: 'opf2-spine-image',
+    area: 'opf',
+    description: 'image media type in the spine (epubcheck OPF-042)',
+    epub: buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2
+          .replace('</manifest>', '<item id="img" href="cover.gif" media-type="image/gif"/></manifest>')
+          .replace('<itemref idref="content"/>', '<itemref idref="content"/><itemref idref="img"/>'),
+        'EPUB/cover.gif': 'GIF89a',
+      },
+    }),
+    expected: [E('OPF-042', 'ERROR')],
+  },
+  {
+    name: 'opf2-spine-foreign-no-fallback',
+    area: 'opf',
+    description: 'foreign spine item without fallback (epubcheck OPF-043)',
+    epub: buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2
+          .replace('</manifest>', '<item id="pdf" href="doc.pdf" media-type="application/pdf"/></manifest>')
+          .replace('<itemref idref="content"/>', '<itemref idref="content"/><itemref idref="pdf"/>'),
+        'EPUB/doc.pdf': '%PDF-1.4',
+      },
+    }),
+    expected: [E('OPF-043', 'ERROR')],
+  },
+  {
+    name: 'opf2-spine-foreign-bad-fallback',
+    area: 'opf',
+    description: 'foreign spine item whose fallback chain never reaches a content document (epubcheck OPF-044)',
+    epub: buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2
+          .replace(
+            '</manifest>',
+            '<item id="pdf" href="doc.pdf" media-type="application/pdf" fallback="img"/>' +
+              '<item id="img" href="cover.gif" media-type="image/gif"/></manifest>',
+          )
+          .replace('<itemref idref="content"/>', '<itemref idref="content"/><itemref idref="pdf"/>'),
+        'EPUB/doc.pdf': '%PDF-1.4',
+        'EPUB/cover.gif': 'GIF89a',
+      },
+    }),
+    expected: [E('OPF-044', 'ERROR')],
+  },
+  {
+    name: 'opf2-fallback-unresolved',
+    area: 'opf',
+    description: 'fallback idref not in the manifest (epubcheck OPF-040; the dangling chain also fails the content-document requirement → OPF-044)',
+    epub: buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2
+          .replace('</manifest>', '<item id="pdf" href="doc.pdf" media-type="application/pdf" fallback="ghost"/></manifest>')
+          .replace('<itemref idref="content"/>', '<itemref idref="content"/><itemref idref="pdf"/>'),
+        'EPUB/doc.pdf': '%PDF-1.4',
+      },
+    }),
+    expected: [E('OPF-040', 'ERROR'), E('OPF-044', 'ERROR')],
+  },
+  {
+    name: 'opf2-spine-toc-missing',
+    area: 'opf',
+    description: 'EPUB 2 spine without the required toc attribute (schema-level, epubcheck RSC-005; NCX still found by media type)',
+    epub: buildEpub2({ files: { 'EPUB/package.opf': OPF2.replace('<spine toc="ncx">', '<spine>') } }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'opf2-toc-not-ncx',
+    area: 'opf',
+    description: 'spine toc idref resolves to a non-NCX item (epubcheck OPF-050); the XHTML then fails NCX structure (RSC-005)',
+    epub: buildEpub2({ files: { 'EPUB/package.opf': OPF2.replace('<spine toc="ncx">', '<spine toc="content">') } }),
+    expected: [E('OPF-050', 'ERROR'), E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'opf-manifest-self',
+    area: 'opf',
+    description: 'manifest lists the package document itself (epubcheck OPF-099; version-agnostic, EPUB 3 fixture)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace('</manifest>', '<item id="self" href="package.opf" media-type="application/oebps-package+xml"/></manifest>'),
+      },
+    }),
+    expected: [E('OPF-099', 'ERROR')],
+  },
+
+  // ---- EPUB 2 content layer ----
+  {
+    name: 'epub2-remote-image',
+    area: 'content',
+    description: 'remote image reference in an EPUB 2 content doc (epubcheck RSC-006; remote publication resources are forbidden in EPUB 2)',
+    epub: buildEpub2({
+      files: {
+        'EPUB/content_001.xhtml':
+          '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body>' +
+          '<img src="https://example.com/x.png" alt="x"/></body></html>',
+      },
+    }),
+    expected: [E('RSC-006', 'ERROR')],
+  },
+
+  // ---- EPUB 3 legacy NCX ----
+  {
+    name: 'epub3-legacy-ncx-broken',
+    area: 'ncx',
+    description: 'EPUB 3 book shipping a legacy NCX with a mismatched dtb:uid (epubcheck NCX-001 fires for EPUB 3 too)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace('</manifest>', '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/></manifest>'),
+        'EPUB/toc.ncx': NCX2.replace('urn:uuid:00000000-0000-0000-0000-000000000000', 'urn:uuid:mismatch'),
+      },
+    }),
+    expected: [E('NCX-001', 'ERROR')],
   },
 ]
