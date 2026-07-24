@@ -22,7 +22,6 @@
 - `npm run lint`, `npm run typecheck` and `npm test` must all pass at every commit.
 
 ---
-
 ### Task 1: Namespace-aware attributes on XmlNode
 
 `XmlNode.attrs` is `Record<string, string>` and carries no namespace information, but the grammar distinguishes `opf:file-as` (in the OPF namespace) from `scheme` (in no namespace). The schema layer also needs attributes in document order, because the expected-attribute list narrows by what was consumed *before* the offender.
@@ -131,7 +130,6 @@ git commit -m "feat: namespace-aware, document-ordered attributes on XmlNode"
 ```
 
 ---
-
 ### Task 2: Pattern types, smart constructors, nullable
 
 **Files:**
@@ -365,7 +363,6 @@ git commit -m "feat: RelaxNG pattern types and smart constructors"
 ```
 
 ---
-
 ### Task 3: Datatypes
 
 Only the datatypes these grammars need, with the exact message tails EPUBCheck emits.
@@ -509,7 +506,6 @@ git commit -m "feat: RelaxNG datatypes with EPUBCheck message tails"
 ```
 
 ---
-
 ### Task 4: Derivative algorithm
 
 James Clark's algorithm over the pattern types from Task 2.
@@ -783,7 +779,6 @@ git commit -m "feat: RelaxNG derivative algorithm (Clark) scoped to OPF grammars
 ```
 
 ---
-
 ### Task 5: Expected-name projection
 
 The dynamic lists in EPUBCheck's messages are the accepted-name set of the current derivative. This task extracts them.
@@ -1058,7 +1053,6 @@ git commit -m "feat: expected-name projection over RelaxNG derivatives"
 ```
 
 ---
-
 ### Task 6: Message shapes
 
 The ten detail strings, transcribed from EPUBCheck 5.3.0. Includes the PR #28 document-order regression test.
@@ -1289,7 +1283,6 @@ git commit -m "feat: RSC-005 detail strings for RelaxNG failures"
 ```
 
 ---
-
 ### Task 7: Validating driver
 
 Walks an `XmlNode` tree against a grammar, recovers from each failure so multiple messages are reported per element (as the jar does), and emits `RSC-005`.
@@ -1687,7 +1680,6 @@ git commit -m "feat: schema-validating driver with jar-matching error recovery"
 ```
 
 ---
-
 ### Task 8: The OPF 2.0 grammar
 
 **Files:**
@@ -1969,7 +1961,6 @@ git commit -m "feat: OPF 2.0 grammar transcribed from opf20.rng"
 ```
 
 ---
-
 ### Task 9: The package-30 grammar
 
 **Files:**
@@ -2258,7 +2249,6 @@ git commit -m "feat: package-30 grammar transcribed from package-30.rnc"
 ```
 
 ---
-
 ### Task 10: Schematron rules
 
 Two XPath assertions that are not in the RNG. Unique `id` applies to both versions; duplicate `reference` is EPUB 2 only (`schema/20/sch/opf.sch`).
@@ -2418,239 +2408,7 @@ git commit -m "feat: OPF schematron rules (unique id, duplicate guide reference)
 ```
 
 ---
-
-### Task 11: Retain the parsed root and wire the schema layer in
-
-**Files:**
-- Modify: `src/parse/opf.ts` (add `root`, remove `metas`/`OpfMeta`/`schemaAttrs`)
-- Create: `src/checks/schema.ts`
-- Modify: `src/validate.ts`
-- Test: `src/checks/schema.test.ts`, and update `src/parse/opf.test.ts`
-
-**Interfaces:**
-- Consumes: `OPF20`, `PACKAGE30`, `validateAgainst`, `checkUniqueIds`, `checkDuplicateReferences`.
-- Produces: `PackageDocument.root: XmlNode`; `validateSchema(pkg, version): Message[]`.
-
-- [ ] **Step 1: Write the failing test**
-
-Create `src/checks/schema.test.ts`:
-
-```ts
-import { describe, it, expect } from 'vitest'
-import { parseXml } from '../io/xml.js'
-import { validateSchema } from './schema.js'
-import type { PackageDocument } from '../parse/opf.js'
-
-const OPF_NS = 'http://www.idpf.org/2007/opf'
-const DC_NS = 'http://purl.org/dc/elements/1.1/'
-
-const pkgDoc = (xml: string): PackageDocument =>
-  ({
-    path: 'EPUB/package.opf',
-    root: parseXml(new TextEncoder().encode(xml), 'EPUB/package.opf').root!,
-  }) as PackageDocument
-
-const EPUB2 =
-  `<package xmlns="${OPF_NS}" xmlns:dc="${DC_NS}" version="2.0" unique-identifier="uid">` +
-  `<metadata><dc:identifier id="uid">u</dc:identifier><dc:title>T</dc:title><dc:language>en</dc:language></metadata>` +
-  `<manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/></manifest>` +
-  `<spine toc="ncx"><itemref idref="ncx"/></spine></package>`
-
-const EPUB3 =
-  `<package xmlns="${OPF_NS}" xmlns:dc="${DC_NS}" version="3.0" unique-identifier="uid">` +
-  `<metadata><dc:identifier id="uid">u</dc:identifier><dc:title>T</dc:title><dc:language>en</dc:language>` +
-  `<meta property="dcterms:modified">2019-01-01T00:00:00Z</meta></metadata>` +
-  `<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest>` +
-  `<spine><itemref idref="nav"/></spine></package>`
-
-describe('validateSchema', () => {
-  it('validates an EPUB 2 package against opf20', () => {
-    expect(validateSchema(pkgDoc(EPUB2), '2.0')).toEqual([])
-    expect(
-      validateSchema(pkgDoc(EPUB2.replace('<spine toc="ncx">', '<spine>')), '2.0').map((m) => m.message),
-    ).toEqual([
-      "Error while parsing file 'EPUB/package.opf': element \"spine\" missing required attribute \"toc\"",
-    ])
-  })
-
-  it('validates an EPUB 3 package against package-30', () => {
-    expect(validateSchema(pkgDoc(EPUB3), '3.3')).toEqual([])
-  })
-
-  it('treats an unknown version as EPUB 3, matching the dcterms:modified gating', () => {
-    expect(validateSchema(pkgDoc(EPUB3), undefined)).toEqual([])
-  })
-
-  it('applies the unique-id schematron rule', () => {
-    const dup = EPUB2.replace('id="ncx"', 'id="uid"')
-    expect(validateSchema(pkgDoc(dup), '2.0').filter((m) => m.message.includes('unique value'))).toHaveLength(2)
-  })
-
-  it('applies the duplicate-reference rule only to EPUB 2', () => {
-    const withGuide = EPUB2.replace(
-      '</package>',
-      '<guide><reference type="text" href="a"/><reference type="text" href="a"/></guide></package>',
-    )
-    const messages = validateSchema(pkgDoc(withGuide), '2.0')
-    expect(messages.filter((m) => m.id === 'RSC-017')).toHaveLength(1)
-  })
-})
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `npx vitest run src/checks/schema.test.ts`
-Expected: FAIL — cannot resolve `./schema.js`.
-
-- [ ] **Step 3: Implement**
-
-In `src/parse/opf.ts`:
-
-1. Delete the `OpfMeta` interface, the `metas` field, the `schemaAttrs` helper, and the `metas.push({...})` block inside the metadata loop. Delete the now-unused `OPF_NS` constant if nothing else uses it.
-2. Add to `PackageDocument`, after `path`:
-
-```ts
-  /**
-   * The parsed package document, retained so the schema layer can validate the
-   * whole tree. The typed projections below stay for the semantic checks.
-   */
-  root: XmlNode
-```
-
-3. Add `root,` to the `pkg` object literal (after `path: opfPath,`).
-4. Ensure `XmlNode` is imported as a type: the existing import becomes
-   `import { parseXml, childElements, type XmlNode } from '../io/xml.js'` (it already is).
-
-Create `src/checks/schema.ts`:
-
-```ts
-import type { Message } from '../messages/format.js'
-import type { PackageDocument } from '../parse/opf.js'
-import { majorVersion, type EpubVersion } from '../versions.js'
-import { validateAgainst } from '../schema/validate.js'
-import { OPF20 } from '../schema/opf20.js'
-import { PACKAGE30 } from '../schema/package30.js'
-import { checkDuplicateReferences, checkUniqueIds } from '../schema/schematron.js'
-
-/**
- * Validate the package document against its RelaxNG grammar, the way EPUBCheck does.
- * An unknown version is treated as EPUB 3, matching the gating the dcterms:modified
- * rule and checkEpub2 already use.
- */
-export function validateSchema(pkg: PackageDocument, version: EpubVersion | undefined): Message[] {
-  const isEpub2 = version !== undefined && majorVersion(version) === '2.0'
-  const grammar = isEpub2 ? OPF20 : PACKAGE30
-
-  const messages: Message[] = [
-    ...validateAgainst(grammar, pkg.root, pkg.path),
-    ...checkUniqueIds(pkg.root, pkg.path),
-  ]
-  // opf_guideReferenceUnique is in schema/20/sch/opf.sch only.
-  if (isEpub2) messages.push(...checkDuplicateReferences(pkg.root, pkg.path))
-  return messages
-}
-```
-
-In `src/validate.ts`:
-
-1. Add the import: `import { validateSchema } from './checks/schema.js'`
-2. Inside `if (pkg) { ... }`, immediately after `messages.push(...validateOpf(pkg, container, target))`, add:
-
-```ts
-      messages.push(...validateSchema(pkg, target))
-```
-
-In `src/parse/opf.test.ts`, delete the `metas` describe block added by PR #28 and add:
-
-```ts
-  it('retains the parsed root for the schema layer', () => {
-    const { pkg } = parseOpf(containerWith(OPF))
-    expect(pkg!.root.name).toBe('package')
-  })
-```
-
-(adapting `containerWith` to whatever helper that file already uses).
-
-- [ ] **Step 4: Run tests**
-
-Run: `npx vitest run src/checks/schema.test.ts src/parse/opf.test.ts && npm run typecheck && npm run lint`
-Expected: PASS. The full suite will still be red — Task 12 finishes the consolidation.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/parse/opf.ts src/parse/opf.test.ts src/checks/schema.ts src/checks/schema.test.ts src/validate.ts
-git commit -m "feat: retain the parsed OPF root and run the schema layer"
-```
-
----
-
-### Task 12: Consolidate the six hand-written approximations
-
-`checkEpub2Metas` and five other checks now duplicate what the schema layer emits, with invented wording. Delete them.
-
-**Files:**
-- Modify: `src/checks/opf.ts` (delete `quotedList`, `OPF2_META_*`, `checkEpub2Metas`, and five approximations)
-- Modify: `src/checks/opf.test.ts`
-
-- [ ] **Step 1: Run the full suite to see the current damage**
-
-Run: `npm test 2>&1 | tail -40`
-Expected: failures in `src/checks/opf.test.ts` and the integration/corpus suites from duplicated messages.
-
-- [ ] **Step 2: Delete the superseded code**
-
-In `src/checks/opf.ts`:
-
-1. Delete `OPF2_META_REQUIRED_ATTRS`, `OPF2_META_ALLOWED_ATTRS`, `quotedList` and the whole `checkEpub2Metas` function, plus the `messages.push(...checkEpub2Metas(pkg))` call and its comment inside `checkEpub2`.
-2. In `checkPackage`, delete the three `RSC-005` pushes for missing `dc:identifier` / `dc:title` / `dc:language` (the schema layer emits `element "metadata" incomplete; missing required element "dc:title"`). Keep `OPF-048`, `OPF-030` and the `dcterms:modified` rule, which are not RNG-derived.
-3. In `checkManifest`, delete the `RSC-005` push for a missing `id`/`href`/`media-type` and the `Duplicate manifest item id` push (keep the `seenIds` set only if still used; if not, delete it too). Keep `OPF-040`, `OPF-074`, `OPF-099` and `RSC-001`.
-4. In `checkSpineAndNav`, delete the `spinePresent` and `spine.length === 0` `RSC-005` pushes and restructure to:
-
-```ts
-  const ids = new Set(pkg.manifest.map((i) => i.id).filter((id): id is string => Boolean(id)))
-  for (const ref of pkg.spine) {
-    if (ref.idref && !ids.has(ref.idref)) {
-      messages.push(msg('OPF-049', ref.loc, ref.idref))
-    }
-  }
-  if (pkg.spine.length > 0 && !pkg.spine.some((s) => s.linear)) {
-    messages.push(msg('OPF-033', pkg.loc))
-  }
-```
-
-5. In `checkEpub2`, delete the `RSC-005` push for a missing `toc` attribute, keeping the `OPF-049`/`OPF-050` branches:
-
-```ts
-  if (pkg.spinePresent && pkg.spineToc !== undefined) {
-    const tocItem = byId.get(pkg.spineToc)
-    if (tocItem === undefined) {
-      messages.push(msg('OPF-049', pkg.spineLoc ?? pkg.loc, pkg.spineToc))
-    } else if (tocItem.mediaType !== NCX_MEDIA_TYPE) {
-      messages.push(msg('OPF-050', tocItem.loc))
-    }
-  }
-```
-
-- [ ] **Step 3: Update the unit tests**
-
-In `src/checks/opf.test.ts`, delete the `checkEpub2Metas` describe block added by PR #28 and any assertion on the six deleted message strings. Assertions on `OPF-*` ids stay.
-
-- [ ] **Step 4: Run the full suite**
-
-Run: `npm test && npm run typecheck && npm run lint`
-Expected: `src/**` green. `test/integration/**` and the corpus may still fail on message counts — that is Task 14's rebaseline. Note the failures; do not weaken assertions here.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/checks/opf.ts src/checks/opf.test.ts
-git commit -m "refactor: drop six hand-written checks the schema layer now covers"
-```
-
----
-
-### Task 13: The differential harness
+### Task 11: The differential harness
 
 This was scratch work in PR #2 and PR #28 and was lost both times. It is committed now.
 
@@ -2939,17 +2697,25 @@ describe.skipIf(!enabled)('differential parity with EPUBCheck 5.3.0', () => {
 })
 ```
 
-- [ ] **Step 4: Run the harness**
+- [ ] **Step 4: Run the harness and record the BASELINE parity**
 
-Run: `EPUBCHECK_DIFF=1 npx vitest run test/differential 2>&1 | tail -60`
+Run: `EPUBCHECK_DIFF=1 npx vitest run test/differential 2>&1 | tail -80`
 
-Expected: a parity report. Not every case will match on the first run — the jar also emits `OPF-*`, `RSC-00x` and `NCX-*` messages epubcheck-ts does not implement. For each mismatch, classify it:
+The schema layer is **not wired in yet** — that happens in Task 12 — so most cases are
+expected to fail here. That is the point: this run establishes the *before* number.
 
-- **wording differs on a message we do emit** → fix the grammar or `messages.ts`.
-- **jar emits an id we do not implement at all** → out of scope; add the id to a `KNOWN_UNIMPLEMENTED` set in `harness.ts` and filter it from the jar side before comparing, with a comment naming the id.
-- **we emit something the jar does not** → a false positive. Fix it, or add the detail to `SUPPRESSED` in `src/schema/validate.ts`.
+Two things to do, and only these two:
 
-Record the final parity count; it goes in the PR summary.
+1. **Record the baseline parity count** (`N/M` cases matching) in the commit message.
+   Task 13 records the *after* count, and the pair goes in the PR summary.
+2. **Populate `KNOWN_UNIMPLEMENTED`.** Scan the failures for message ids the jar emits
+   that epubcheck-ts does not implement at all — check each candidate against
+   `test/fixtures/implemented.ts`, and add only ids absent from `IMPLEMENTED_IDS`,
+   each with a comment naming the rule. This makes the harness measure parity on the
+   rules we claim to cover.
+
+Do **not** change any grammar, message or driver code in this task. Wording mismatches
+are Task 12's and Task 13's business, once the layer is actually running.
 
 - [ ] **Step 5: Document and commit**
 
@@ -2969,29 +2735,292 @@ It is skipped unless `EPUBCHECK_DIFF=1` is set and `epubcheck` is on PATH, so CI
 the jar stays green.
 ```
 
+Verify the default suite is unaffected before committing:
+
+Run: `npm test && npm run lint && npm run typecheck`
+Expected: PASS, with the differential suite skipped (no `EPUBCHECK_DIFF`).
+
 ```bash
-git add test/differential README.md src/schema/validate.ts
-git commit -m "test: committed differential harness against the EPUBCheck jar"
+git add test/differential README.md
+git commit -m "test: differential harness against the EPUBCheck jar (baseline parity N/M)"
 ```
 
 ---
 
-### Task 14: Corpus fixtures and rebaseline
+### Task 12: Wire in the schema layer and retire the hand-written approximations
+
+This is one atomic behaviour change: the schema layer starts emitting, and the six
+hand-written checks it subsumes stop. Splitting it would leave a commit where both
+fire and every EPUB reports its schema failures twice, so it lands together and the
+suite is green at the end.
 
 **Files:**
-- Modify: `test/fixtures/corpus.ts`, `test/fixtures/implemented.ts`
-- Modify: `test/integration/opf.test.ts` and any other integration file the schema layer changes
+- Modify: `src/parse/opf.ts` (add `root`, remove `metas`/`OpfMeta`/`schemaAttrs`)
+- Create: `src/checks/schema.ts`
+- Modify: `src/validate.ts`, `src/checks/opf.ts`, `src/checks/opf.test.ts`, `src/parse/opf.test.ts`
+- Modify: `test/fixtures/implemented.ts`, `test/fixtures/corpus.ts`, `test/integration/**`
+- Test: `src/checks/schema.test.ts`
 
-- [ ] **Step 1: See what moved**
+**Interfaces:**
+- Consumes: `OPF20`, `PACKAGE30`, `validateAgainst`, `checkUniqueIds`, `checkDuplicateReferences`.
+- Produces: `PackageDocument.root: XmlNode`; `validateSchema(pkg, version): Message[]`.
 
-Run: `npm test 2>&1 | tail -60`
-Expected: corpus and integration failures listing added/removed `RSC-005` entries.
 
-- [ ] **Step 2: Add RSC-017 to the implemented set**
+**Files:**
+- Modify: `src/parse/opf.ts` (add `root`, remove `metas`/`OpfMeta`/`schemaAttrs`)
+- Create: `src/checks/schema.ts`
+- Modify: `src/validate.ts`
+- Test: `src/checks/schema.test.ts`, and update `src/parse/opf.test.ts`
+
+**Interfaces:**
+- Consumes: `OPF20`, `PACKAGE30`, `validateAgainst`, `checkUniqueIds`, `checkDuplicateReferences`.
+- Produces: `PackageDocument.root: XmlNode`; `validateSchema(pkg, version): Message[]`.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `src/checks/schema.test.ts`:
+
+```ts
+import { describe, it, expect } from 'vitest'
+import { parseXml } from '../io/xml.js'
+import { validateSchema } from './schema.js'
+import type { PackageDocument } from '../parse/opf.js'
+
+const OPF_NS = 'http://www.idpf.org/2007/opf'
+const DC_NS = 'http://purl.org/dc/elements/1.1/'
+
+const pkgDoc = (xml: string): PackageDocument =>
+  ({
+    path: 'EPUB/package.opf',
+    root: parseXml(new TextEncoder().encode(xml), 'EPUB/package.opf').root!,
+  }) as PackageDocument
+
+const EPUB2 =
+  `<package xmlns="${OPF_NS}" xmlns:dc="${DC_NS}" version="2.0" unique-identifier="uid">` +
+  `<metadata><dc:identifier id="uid">u</dc:identifier><dc:title>T</dc:title><dc:language>en</dc:language></metadata>` +
+  `<manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/></manifest>` +
+  `<spine toc="ncx"><itemref idref="ncx"/></spine></package>`
+
+const EPUB3 =
+  `<package xmlns="${OPF_NS}" xmlns:dc="${DC_NS}" version="3.0" unique-identifier="uid">` +
+  `<metadata><dc:identifier id="uid">u</dc:identifier><dc:title>T</dc:title><dc:language>en</dc:language>` +
+  `<meta property="dcterms:modified">2019-01-01T00:00:00Z</meta></metadata>` +
+  `<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest>` +
+  `<spine><itemref idref="nav"/></spine></package>`
+
+describe('validateSchema', () => {
+  it('validates an EPUB 2 package against opf20', () => {
+    expect(validateSchema(pkgDoc(EPUB2), '2.0')).toEqual([])
+    expect(
+      validateSchema(pkgDoc(EPUB2.replace('<spine toc="ncx">', '<spine>')), '2.0').map((m) => m.message),
+    ).toEqual([
+      "Error while parsing file 'EPUB/package.opf': element \"spine\" missing required attribute \"toc\"",
+    ])
+  })
+
+  it('validates an EPUB 3 package against package-30', () => {
+    expect(validateSchema(pkgDoc(EPUB3), '3.3')).toEqual([])
+  })
+
+  it('treats an unknown version as EPUB 3, matching the dcterms:modified gating', () => {
+    expect(validateSchema(pkgDoc(EPUB3), undefined)).toEqual([])
+  })
+
+  it('applies the unique-id schematron rule', () => {
+    const dup = EPUB2.replace('id="ncx"', 'id="uid"')
+    expect(validateSchema(pkgDoc(dup), '2.0').filter((m) => m.message.includes('unique value'))).toHaveLength(2)
+  })
+
+  it('applies the duplicate-reference rule only to EPUB 2', () => {
+    const withGuide = EPUB2.replace(
+      '</package>',
+      '<guide><reference type="text" href="a"/><reference type="text" href="a"/></guide></package>',
+    )
+    const messages = validateSchema(pkgDoc(withGuide), '2.0')
+    expect(messages.filter((m) => m.id === 'RSC-017')).toHaveLength(1)
+  })
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run src/checks/schema.test.ts`
+Expected: FAIL — cannot resolve `./schema.js`.
+
+- [ ] **Step 3: Implement**
+
+In `src/parse/opf.ts`:
+
+1. Delete the `OpfMeta` interface, the `metas` field, the `schemaAttrs` helper, and the `metas.push({...})` block inside the metadata loop. Delete the now-unused `OPF_NS` constant if nothing else uses it.
+2. Add to `PackageDocument`, after `path`:
+
+```ts
+  /**
+   * The parsed package document, retained so the schema layer can validate the
+   * whole tree. The typed projections below stay for the semantic checks.
+   */
+  root: XmlNode
+```
+
+3. Add `root,` to the `pkg` object literal (after `path: opfPath,`).
+4. Ensure `XmlNode` is imported as a type: the existing import becomes
+   `import { parseXml, childElements, type XmlNode } from '../io/xml.js'` (it already is).
+
+Create `src/checks/schema.ts`:
+
+```ts
+import type { Message } from '../messages/format.js'
+import type { PackageDocument } from '../parse/opf.js'
+import { majorVersion, type EpubVersion } from '../versions.js'
+import { validateAgainst } from '../schema/validate.js'
+import { OPF20 } from '../schema/opf20.js'
+import { PACKAGE30 } from '../schema/package30.js'
+import { checkDuplicateReferences, checkUniqueIds } from '../schema/schematron.js'
+
+/**
+ * Validate the package document against its RelaxNG grammar, the way EPUBCheck does.
+ * An unknown version is treated as EPUB 3, matching the gating the dcterms:modified
+ * rule and checkEpub2 already use.
+ */
+export function validateSchema(pkg: PackageDocument, version: EpubVersion | undefined): Message[] {
+  const isEpub2 = version !== undefined && majorVersion(version) === '2.0'
+  const grammar = isEpub2 ? OPF20 : PACKAGE30
+
+  const messages: Message[] = [
+    ...validateAgainst(grammar, pkg.root, pkg.path),
+    ...checkUniqueIds(pkg.root, pkg.path),
+  ]
+  // opf_guideReferenceUnique is in schema/20/sch/opf.sch only.
+  if (isEpub2) messages.push(...checkDuplicateReferences(pkg.root, pkg.path))
+  return messages
+}
+```
+
+In `src/validate.ts`:
+
+1. Add the import: `import { validateSchema } from './checks/schema.js'`
+2. Inside `if (pkg) { ... }`, immediately after `messages.push(...validateOpf(pkg, container, target))`, add:
+
+```ts
+      messages.push(...validateSchema(pkg, target))
+```
+
+In `src/parse/opf.test.ts`, delete the `metas` describe block added by PR #28 and add:
+
+```ts
+  it('retains the parsed root for the schema layer', () => {
+    const { pkg } = parseOpf(containerWith(OPF))
+    expect(pkg!.root.name).toBe('package')
+  })
+```
+
+(adapting `containerWith` to whatever helper that file already uses).
+
+
+- [ ] **Step 4: Delete the superseded checks**
+
+- [ ] **Step 2: Delete the superseded code**
+
+In `src/checks/opf.ts`:
+
+1. Delete `OPF2_META_REQUIRED_ATTRS`, `OPF2_META_ALLOWED_ATTRS`, `quotedList` and the whole `checkEpub2Metas` function, plus the `messages.push(...checkEpub2Metas(pkg))` call and its comment inside `checkEpub2`.
+2. In `checkPackage`, delete the three `RSC-005` pushes for missing `dc:identifier` / `dc:title` / `dc:language` (the schema layer emits `element "metadata" incomplete; missing required element "dc:title"`). Keep `OPF-048`, `OPF-030` and the `dcterms:modified` rule, which are not RNG-derived.
+3. In `checkManifest`, delete the `RSC-005` push for a missing `id`/`href`/`media-type` and the `Duplicate manifest item id` push (keep the `seenIds` set only if still used; if not, delete it too). Keep `OPF-040`, `OPF-074`, `OPF-099` and `RSC-001`.
+4. In `checkSpineAndNav`, delete the `spinePresent` and `spine.length === 0` `RSC-005` pushes and restructure to:
+
+```ts
+  const ids = new Set(pkg.manifest.map((i) => i.id).filter((id): id is string => Boolean(id)))
+  for (const ref of pkg.spine) {
+    if (ref.idref && !ids.has(ref.idref)) {
+      messages.push(msg('OPF-049', ref.loc, ref.idref))
+    }
+  }
+  if (pkg.spine.length > 0 && !pkg.spine.some((s) => s.linear)) {
+    messages.push(msg('OPF-033', pkg.loc))
+  }
+```
+
+5. In `checkEpub2`, delete the `RSC-005` push for a missing `toc` attribute, keeping the `OPF-049`/`OPF-050` branches:
+
+```ts
+  if (pkg.spinePresent && pkg.spineToc !== undefined) {
+    const tocItem = byId.get(pkg.spineToc)
+    if (tocItem === undefined) {
+      messages.push(msg('OPF-049', pkg.spineLoc ?? pkg.loc, pkg.spineToc))
+    } else if (tocItem.mediaType !== NCX_MEDIA_TYPE) {
+      messages.push(msg('OPF-050', tocItem.loc))
+    }
+  }
+```
+
+- [ ] **Step 3: Update the unit tests**
+
+In `src/checks/opf.test.ts`, delete the `checkEpub2Metas` describe block added by PR #28 and any assertion on the six deleted message strings. Assertions on `OPF-*` ids stay.
+
+
+- [ ] **Step 5: Add RSC-017 to the implemented set**
 
 In `test/fixtures/implemented.ts`, add `'RSC-017'` to the resources line if absent.
 
-- [ ] **Step 3: Add fixture pairs**
+- [ ] **Step 6: Rebaseline existing expectations against the jar**
+
+Run: `npm test 2>&1 | tail -60`
+
+Existing corpus and integration expectations will fail where the schema layer
+legitimately adds messages — a missing `unique-identifier`, for example, now gains an
+`RSC-005` alongside today's `OPF-048`/`OPF-030`.
+
+For **every** failing expectation, confirm the new output against the jar before
+changing it. The harness from Task 11 is the tool:
+
+```bash
+EPUBCHECK_DIFF=1 npx vitest run test/differential
+```
+
+If a fixture has no differential case, add one to `test/differential/cases.ts` rather
+than guessing. Take the id/severity multiset from the jar's output, filtered to ids in
+`IMPLEMENTED_IDS`.
+
+**Change the fixture's `expected`, never the assertion logic.** A rebaseline that is
+not justified by jar output is a bug being enshrined. Add a comment on any non-obvious
+one:
+
+```ts
+    // The schema layer now also reports the RNG failure the jar emits alongside
+    // OPF-048/OPF-030 for a missing unique-identifier.
+```
+
+If a failure is a message the jar does **not** emit, that is a false positive in the
+new code — fix the grammar or driver, or add the detail to `SUPPRESSED` in
+`src/schema/validate.ts` with a comment. Do not rebaseline it away.
+
+- [ ] **Step 7: Run everything**
+
+Run: `npm test && npm run typecheck && npm run lint && npm run build`
+Expected: all green. Record the test count; the baseline before this plan was 374.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/parse/opf.ts src/parse/opf.test.ts src/checks/schema.ts src/checks/schema.test.ts \
+        src/checks/opf.ts src/checks/opf.test.ts src/validate.ts \
+        test/fixtures/implemented.ts test/fixtures/corpus.ts test/integration
+git commit -m "feat: validate package documents against their RelaxNG grammar
+
+Retires six hand-written approximations the schema layer now covers, and
+rebaselines corpus expectations against EPUBCheck 5.3.0 output."
+```
+
+---
+### Task 13: New corpus fixtures
+
+Task 12 rebaselined the *existing* fixtures. This task adds the new valid/invalid pairs
+that lock in the content model, and records the final differential parity.
+
+**Files:**
+- Modify: `test/fixtures/corpus.ts`
+
+- [ ] **Step 1: Add fixture pairs**
 
 Append to `test/fixtures/corpus.ts`, following the file's existing `{ area, name, epub, expected }` shape.
 
@@ -3221,25 +3250,31 @@ Take the id/severity multiset from the jar's output, filtered to ids in
 `IMPLEMENTED_IDS`. If a fixture's real output differs from what is written above,
 change the fixture's `expected` — never the assertion logic.
 
-- [ ] **Step 4: Rebaseline existing expectations**
+- [ ] **Step 2: Record the final differential parity**
 
-For every pre-existing corpus or integration expectation that now fails, confirm the new message against the jar before changing the expectation. Add a comment on any non-obvious rebaseline, e.g.:
+Run: `EPUBCHECK_DIFF=1 npx vitest run test/differential 2>&1 | tail -80`
 
-```ts
-    // The schema layer now also reports the RNG failure the jar emits alongside
-    // OPF-048/OPF-030 for a missing unique-identifier.
-```
+Record the `N/M` count. Task 11's commit message holds the baseline; this is the
+*after* number, and the pair goes in the PR summary.
 
-- [ ] **Step 5: Run everything**
+Any case still failing must be classified, not ignored:
+
+- **wording differs on a message we emit** → fix the grammar or `messages.ts`.
+- **we emit something the jar does not** → a false positive; fix it, or add the detail
+  to `SUPPRESSED` in `src/schema/validate.ts` with a comment.
+- **jar emits an id we do not implement** → add it to `KNOWN_UNIMPLEMENTED` with a
+  comment, having confirmed it is absent from `IMPLEMENTED_IDS`.
+
+- [ ] **Step 3: Run everything**
 
 Run: `npm test && npm run typecheck && npm run lint && npm run build`
 Expected: all green. Record the final test count for the PR summary (baseline was 374).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add test/fixtures/corpus.ts test/fixtures/implemented.ts test/integration
-git commit -m "test: corpus fixtures for the OPF content model; rebaseline against the jar"
+git add test/fixtures/corpus.ts test/differential src/schema
+git commit -m "test: corpus fixtures pinning the OPF content model"
 ```
 
 ---
@@ -3248,5 +3283,7 @@ git commit -m "test: corpus fixtures for the OPF content model; rebaseline again
 
 - [ ] `npm test` — all green; note the count against the 374 baseline.
 - [ ] `npm run lint`, `npm run typecheck`, `npm run build` — all green.
-- [ ] `EPUBCHECK_DIFF=1 npx vitest run test/differential` — record the parity count.
-- [ ] Write the PR summary covering: per-element migration impact, the parity count, everything in `SUPPRESSED` and why, everything in `KNOWN_UNIMPLEMENTED` and why, and which elements were left unvalidated because the false-positive risk outweighed the coverage.
+- [ ] `EPUBCHECK_DIFF=1 npx vitest run test/differential` — record baseline and final parity.
+- [ ] Write the PR summary covering: per-element migration impact, the before/after parity counts, everything in `SUPPRESSED` and why, everything in `KNOWN_UNIMPLEMENTED` and why, and which elements were left unvalidated because the false-positive risk outweighed the coverage.
+
+---
