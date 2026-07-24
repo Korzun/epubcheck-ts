@@ -59,6 +59,15 @@ describe('expectedAttributes', () => {
     const afterName = attDeriv(open, { qname: 'name', local: 'name', value: 'x' })
     expect(expectedAttributes(afterName)).toEqual(['id'])
   })
+  it('recurses into both sides of a raw group, not only via interleave/choice/after', () => {
+    // Every other test above reaches collectAttributes's group case indirectly, via
+    // all() (interleave) or choice/after. Exercise `group` directly: attribute patterns
+    // are never nullable, so a regression that wrongly gated the group branch on
+    // `nullable(p1)` (mirroring collectElements's group handling) would silently drop
+    // p2 here and this test would catch it.
+    const p = group(attribute(N('a'), data(DT_TEXT)), attribute(N('b'), data(DT_TEXT)))
+    expect(expectedAttributes(p)).toEqual(['a', 'b'])
+  })
 })
 
 describe('requiredElements and requiredAttributes', () => {
@@ -105,6 +114,18 @@ describe('grammarNames', () => {
       optional(ref(() => collectionRef.current)),
     )
     const names = grammarNames(collectionRef.current)
+    expect(names).toEqual(new Set(['collection']))
+  })
+  it('terminates on a self-recursive builder function, not just a memoized ref cell', () => {
+    // Unlike the memoized-cell test above, `collectionPattern` builds a FRESH object
+    // graph on every call: each `resolve()` returns a brand-new element/choice/ref
+    // triple, so the object-identity `seen` guard alone never re-hits and a
+    // naive walk recurses until the stack overflows. Only the ref-thunk guard
+    // (tracking `resolve` itself, a stable function reference) stops this.
+    function collectionPattern(): import('./pattern.js').Pattern {
+      return element(N('collection'), optional(ref(collectionPattern)))
+    }
+    const names = grammarNames(collectionPattern())
     expect(names).toEqual(new Set(['collection']))
   })
 })

@@ -1,6 +1,6 @@
-import { deref, displayOf, nullable, type Pattern } from './pattern.js'
+import { ANY_OTHER_NAMESPACE_DISPLAY, deref, displayOf, nullable, type Pattern } from './pattern.js'
 
-const WILDCARD = 'an element from another namespace'
+const WILDCARD = ANY_OTHER_NAMESPACE_DISPLAY
 
 /** Sort display names lexicographically, with the foreign-namespace wildcard last. */
 function order(names: Set<string>): string[] {
@@ -131,13 +131,30 @@ function collectRequired(p: Pattern, out: Set<string>, want: 'element' | 'attrib
  * Every element name that appears anywhere in the grammar. Drives the
  * `not allowed anywhere` vs `not allowed here` split: a name absent from this
  * set is "anywhere", a name present but not currently accepted is "here".
+ *
+ * Two termination guards, for two different ways a grammar can be recursive:
+ *  - `seen` guards by pattern OBJECT IDENTITY. This catches a memoized `ref` cell
+ *    (resolve() always returns the same object) and, as a bonus, any sub-pattern
+ *    reachable via more than one path.
+ *  - `seenThunks` guards by the identity of a `ref`'s `resolve` FUNCTION. A
+ *    self-recursive builder (e.g. `function collectionPattern() { return
+ *    element(..., ref(collectionPattern)) }`) builds a fresh object graph on
+ *    every call, so `seen` alone never re-hits and the walk would recurse
+ *    until the stack overflows. `resolve` itself is a stable function
+ *    reference (a named function or a module-level const arrow), so tracking
+ *    it terminates for both construction styles.
  */
 export function grammarNames(root: Pattern): Set<string> {
   const out = new Set<string>()
   const seen = new Set<Pattern>()
+  const seenThunks = new Set<() => Pattern>()
   const walk = (p: Pattern): void => {
     if (seen.has(p)) return
     seen.add(p)
+    if (p.k === 'ref') {
+      if (seenThunks.has(p.resolve)) return
+      seenThunks.add(p.resolve)
+    }
     const d = deref(p)
     switch (d.k) {
       case 'element':

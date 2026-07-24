@@ -51,6 +51,13 @@ export function element(nc: NameClass, p: Pattern): Pattern {
 export function attribute(nc: NameClass, p: Pattern): Pattern {
   return { k: 'attribute', name: nc, p }
 }
+/**
+ * `resolve` is NOT required to return a stable object: a self-recursive builder
+ * function (as opposed to a memoized cell) will build a fresh object graph on
+ * every call. Traversals over `Pattern` must guard against this — identity-based
+ * "seen" tracking of the resolved objects is not enough on its own; also track
+ * the identity of `resolve` itself, which is stable across calls.
+ */
 export function ref(resolve: () => Pattern): Pattern {
   return { k: 'ref', resolve }
 }
@@ -129,6 +136,9 @@ export function nameMatches(nc: NameClass, ns: string | undefined, local: string
   return !nc.exceptNs.includes(ns ?? '')
 }
 
+/** The display string EPUBCheck uses for a wildcard (foreign-namespace) name class. */
+export const ANY_OTHER_NAMESPACE_DISPLAY = 'an element from another namespace'
+
 export function displayOf(nc: NameClass): string {
-  return nc.k === 'name' ? nc.display : 'an element from another namespace'
+  return nc.k === 'name' ? nc.display : ANY_OTHER_NAMESPACE_DISPLAY
 }
