@@ -107,8 +107,13 @@ describe('content details', () => {
     )
   })
   it('reports an incomplete parent', () => {
-    expect(incompleteMissingElement('spine', 'itemref')).toBe(
+    expect(incompleteMissingElement('spine', ['itemref'])).toBe(
       'element "spine" incomplete; missing required element "itemref"',
+    )
+    // Jar: EPUB 2 <metadata> with two requirements outstanding pluralises and lists
+    // both, joined with `and` — the same shape as missing required attributes.
+    expect(incompleteMissingElement('metadata', ['dc:language', 'dc:title'])).toBe(
+      'element "metadata" incomplete; missing required elements "dc:language" and "dc:title"',
     )
     expect(incompleteExpected('metadata', ['dc:title', 'meta'], false)).toBe(
       'element "metadata" incomplete; expected element "dc:title" or "meta"',

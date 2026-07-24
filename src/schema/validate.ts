@@ -33,6 +33,17 @@ export function makeGrammar(root: Pattern): Grammar {
  */
 const SUPPRESSED: readonly string[] = []
 
+/** What walking a start tag's attributes leaves behind. */
+interface AttributeWalk {
+  /** The pattern with every accepted attribute consumed. */
+  pattern: Pattern
+  /**
+   * Names already reported for an invalid VALUE. They are still outstanding in
+   * `pattern` (`attDeriv` rejected them) but must not be reported missing too.
+   */
+  invalidValued: readonly string[]
+}
+
 /** Qualified name as written, which is the form EPUBCheck echoes. */
 function qnameOf(node: XmlNode): string {
   return node.prefix ? `${node.prefix}:${node.name}` : (node.name ?? '')
@@ -111,9 +122,20 @@ function forgiveAttributes(p: Pattern): Pattern {
  * `itemref` children.
  *
  * `startTagCloseDeriv` returning `notAllowed` can only be caused by an outstanding
- * attribute (it rewrites nothing else, and the pattern was not `notAllowed` when
- * the start tag opened), and that attribute has already been reported by
- * `reportMissingAttributes`. So forgive it and keep the content model intact.
+ * attribute requirement (it rewrites nothing else, and the pattern was not
+ * `notAllowed` when the start tag opened). So forgive that requirement and keep the
+ * content model intact; the attribute problem itself is reported separately, one
+ * line earlier, by `reportBadAttribute` or `reportMissingAttributes`.
+ *
+ * Those two do not cover every case: for a `choice` of required attributes with none
+ * supplied, `collectRequired`'s choice-intersection finds nothing genuinely required,
+ * so nothing is reported and the element is accepted silently. That is the known
+ * exception, recorded in the task report rather than approximated with invented
+ * wording.
+ *
+ * Only the attribute half is forgiven — the returned pattern still carries the
+ * element's own content requirements, so `<spine/>` reports both its missing `toc`
+ * and its missing `itemref`.
  */
 function closeStartTag(afterAttrs: Pattern): Pattern {
   const closed = startTagCloseDeriv(afterAttrs)
@@ -211,9 +233,9 @@ export function validateAgainst(grammar: Grammar, root: XmlNode, path: string): 
     // message is about this element's placement, and its children would all be
     // measured against a pattern that has nothing to say about them.
     if (opened.k === 'notAllowed') return recoverUnknownElement(p, node)
-    const afterAttrs = deriveAttributes(opened, node)
-    reportMissingAttributes(afterAttrs, node)
-    const content = deriveChildren(closeStartTag(afterAttrs), node)
+    const attrs = deriveAttributes(opened, node)
+    reportMissingAttributes(attrs, node)
+    const content = deriveChildren(closeStartTag(attrs.pattern), node)
     const ended = endTagDeriv(content)
     if (ended.k === 'notAllowed') {
       reportIncomplete(content, node)
@@ -243,24 +265,26 @@ export function validateAgainst(grammar: Grammar, root: XmlNode, path: string): 
     return p
   }
 
-  const deriveAttributes = (opened: Pattern, node: XmlNode): Pattern => {
+  const deriveAttributes = (opened: Pattern, node: XmlNode): AttributeWalk => {
     let p = opened
+    const invalidValued: string[] = []
     for (const attr of node.attributes ?? []) {
       const next = attDeriv(p, attr)
       if (next.k !== 'notAllowed') {
         p = next
         continue
       }
-      reportBadAttribute(p, node, attr)
+      if (reportBadAttribute(p, node, attr)) invalidValued.push(attr.qname)
       // Leave `p` unchanged: the jar reports the same expected list for a second
       // unknown attribute on the same element. Attributes accepted BEFORE this one
       // are already gone from `p`, which is the document-order narrowing the jar
       // shows on <dc:creator>.
     }
-    return p
+    return { pattern: p, invalidValued }
   }
 
-  const reportBadAttribute = (p: Pattern, node: XmlNode, attr: XmlAttr): void => {
+  /** Reports the attribute; answers whether its VALUE, rather than its name, was at fault. */
+  const reportBadAttribute = (p: Pattern, node: XmlNode, attr: XmlAttr): boolean => {
     // A declared attribute whose VALUE failed its datatype reports differently
     // from an undeclared one.
     const expected = expectedAttributes(p)
@@ -268,18 +292,26 @@ export function validateAgainst(grammar: Grammar, root: XmlNode, path: string): 
       const dt = datatypeFor(p, attr)
       if (dt) {
         emit(node, invalidAttributeValue(attr.qname, dt.describe(attr.value)))
-        return
+        return true
       }
     }
     if (expected.length === 0) {
       emit(node, noAttributesAllowed(attr.qname))
-      return
+      return false
     }
     emit(node, unknownAttribute(attr.qname, expected))
+    return false
   }
 
-  const reportMissingAttributes = (afterAttrs: Pattern, node: XmlNode): void => {
-    const missing = requiredAttributes(afterAttrs)
+  /**
+   * A required attribute whose value failed its datatype stays outstanding in the
+   * pattern — `attDeriv` rejected it — but it is NOT missing: it was written, and the
+   * jar says so once. `<itemref idref="1"/>` yields the invalid-value message alone,
+   * with no `missing required attribute "idref"` beside it.
+   */
+  const reportMissingAttributes = (attrs: AttributeWalk, node: XmlNode): void => {
+    const missing = requiredAttributes(attrs.pattern)
+      .filter((n) => !attrs.invalidValued.includes(n))
     if (missing.length > 0) emit(node, missingAttributes(qnameOf(node), missing))
   }
 
@@ -306,7 +338,9 @@ export function validateAgainst(grammar: Grammar, root: XmlNode, path: string): 
     const inner = innerOf(content)
     const required = requiredElements(inner)
     if (required.length > 0) {
-      emit(node, incompleteMissingElement(qnameOf(node), required[0]!))
+      // Every outstanding requirement, not just the first: the jar lists them all,
+      // alphabetically and joined with `and`.
+      emit(node, incompleteMissingElement(qnameOf(node), required))
       return
     }
     emit(node, incompleteExpected(qnameOf(node), expectedElements(inner), nullable(inner)))

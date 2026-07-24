@@ -75,8 +75,9 @@ function collectAttributes(p: Pattern, out: Set<string>): void {
 
 /**
  * Element names that MUST still appear for the pattern to be satisfiable.
- * Used for `element "P" incomplete; missing required element "C"`, which
- * EPUBCheck reports one at a time.
+ * Drives `element "P" incomplete; missing required element(s) …`, which lists
+ * every outstanding name, alphabetically — so the whole list is the caller's
+ * message, not just its head.
  */
 export function requiredElements(p: Pattern): string[] {
   const out = new Set<string>()

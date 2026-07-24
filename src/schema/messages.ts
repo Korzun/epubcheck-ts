@@ -12,7 +12,7 @@ export function joinOr(items: readonly string[]): string {
   return `${items.slice(0, -1).join(', ')} or ${items[items.length - 1]}`
 }
 
-/** Same, with a final `and`. Used only for missing required attributes. */
+/** Same, with a final `and`. Used by the two "missing required …" shapes. */
 export function joinAnd(items: readonly string[]): string {
   if (items.length < 2) return items.join('')
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
@@ -80,8 +80,15 @@ export function elementNotAllowedYet(qname: string, missingRequired: string): st
   return `element "${qname}" not allowed yet; missing required element "${missingRequired}"`
 }
 
-export function incompleteMissingElement(parent: string, missing: string): string {
-  return `element "${parent}" incomplete; missing required element "${missing}"`
+/**
+ * Every still-outstanding requirement is listed, pluralised and joined with `and` —
+ * exactly parallel to `missingAttributes`. EPUB 2 `<metadata>` reports
+ * `missing required element "dc:title"` with one outstanding and
+ * `missing required elements "dc:language" and "dc:title"` with two.
+ */
+export function incompleteMissingElement(parent: string, missing: readonly string[]): string {
+  const plural = missing.length > 1 ? 's' : ''
+  return `element "${parent}" incomplete; missing required element${plural} ${joinAnd(quoteAll(missing))}`
 }
 
 export function incompleteExpected(

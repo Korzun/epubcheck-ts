@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseXml } from '../io/xml.js'
 import {
-  EMPTY, element, attribute, name, data, all, oneOrMore, optional, seq, group,
+  EMPTY, element, attribute, name, data, all, choice, oneOrMore, optional, seq, group,
 } from './pattern.js'
 import { DT_TEXT, DT_ID, DT_IDREF } from './datatypes.js'
 import { makeGrammar, validateAgainst } from './validate.js'
@@ -147,6 +147,24 @@ describe('missing required attribute does not cascade', () => {
       detail('element "itemref" missing required attribute "idref"'),
     ])
   })
+
+  // The forgiving close must forgive the ATTRIBUTE only: `<spine/>` is missing its
+  // required `toc` AND its required `itemref` content, and the jar reports both.
+  // A close that returned EMPTY would swallow the second message.
+  it("keeps the element's own content requirement", () => {
+    expect(runSpine(`<spine xmlns="${NS}"/>`)).toEqual([
+      detail('element "spine" missing required attribute "toc"'),
+      detail('element "spine" incomplete; missing required element "itemref"'),
+    ])
+  })
+
+  // Jar ground truth: `<itemref idref="1"/>` where `idref` is required and `1` is not
+  // an NCName produces ONE message. The attribute was supplied, so it is not missing.
+  it('does not also report an attribute whose value was invalid as missing', () => {
+    expect(runSpine(`<spine xmlns="${NS}" toc="t"><itemref idref="1"/></spine>`)).toEqual([
+      detail('value of attribute "idref" is invalid; must be an XML name without colons'),
+    ])
+  })
 })
 
 // Requirement 2 of the recovery rules: the expected-attribute list narrows by
@@ -192,6 +210,42 @@ describe('expected-attribute narrowing', () => {
     const root = parseXml(new TextEncoder().encode(`<m xmlns="${NS}" i="1" t="anything"/>`), 'p.opf').root!
     expect(validateAgainst(MIXED, root, 'p.opf').map((m) => m.message)).toEqual([
       detail('value of attribute "i" is invalid; must be an XML name without colons'),
+    ])
+  })
+})
+
+// Shapes 8 and 9 of the incomplete-parent message, at driver level.
+describe('incomplete parent', () => {
+  // Two outstanding requirements are listed together, alphabetically, joined with
+  // `and` — the jar's EPUB 2 `<metadata>` probe reports
+  // `missing required elements "dc:language" and "dc:title"`, not just one of them.
+  it('lists every outstanding required element', () => {
+    const TWO = makeGrammar(
+      element(EN('metadata'), all(element(EN('title'), EMPTY), element(EN('language'), EMPTY))),
+    )
+    const root = parseXml(new TextEncoder().encode(`<metadata xmlns="${NS}"/>`), 'p.opf').root!
+    expect(validateAgainst(TWO, root, 'p.opf').map((m) => m.message)).toEqual([
+      detail('element "metadata" incomplete; missing required elements "language" and "title"'),
+    ])
+  })
+
+  // Nothing is required by BOTH branches of the choice, so the message falls through
+  // to the expected-list shape. The valid sibling that follows pins that closing the
+  // incomplete element keeps the parent's continuation.
+  it('falls back to the expected list and carries on with the next sibling', () => {
+    const CHOICE = makeGrammar(
+      element(
+        EN('doc'),
+        seq(
+          element(EN('e'), choice(element(EN('a'), EMPTY), element(EN('b'), EMPTY))),
+          element(EN('z'), attribute(N('k'), data(DT_TEXT))),
+        ),
+      ),
+    )
+    const root = parseXml(new TextEncoder().encode(`<doc xmlns="${NS}"><e/><z/></doc>`), 'p.opf').root!
+    expect(validateAgainst(CHOICE, root, 'p.opf').map((m) => m.message)).toEqual([
+      detail('element "e" incomplete; expected element "a" or "b"'),
+      detail('element "z" missing required attribute "k"'),
     ])
   })
 })
