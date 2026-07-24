@@ -59,9 +59,12 @@ function checkPackage(pkg: PackageDocument, version: EpubVersion | undefined): M
     messages.push(msg('OPF-001', loc, `unsupported version "${pkg.version}"`))
   }
 
-  // unique-identifier attribute + resolution
+  // unique-identifier attribute + resolution. An absent attribute yields both
+  // OPF-048 (missing attribute) and OPF-030 with the literal "null" — matching
+  // epubcheck, which resolves the missing reference to a null id.
   if (!pkg.uniqueIdentifier) {
     messages.push(msg('OPF-048', loc))
+    messages.push(msg('OPF-030', loc, 'null'))
   } else if (!pkg.metadata.identifiers.some((i) => i.id === pkg.uniqueIdentifier)) {
     messages.push(msg('OPF-030', loc, pkg.uniqueIdentifier))
   }

@@ -49,6 +49,14 @@ describe('validateOpf — package level', () => {
   it('OPF-048 when unique-identifier attribute is absent', () => {
     expect(ids(validPkg({ uniqueIdentifier: undefined }))).toContain('OPF-048')
   })
+  it('OPF-030 with "null" when unique-identifier attribute is absent (jar parity)', () => {
+    // epubcheck emits BOTH OPF-048 and OPF-030 (resolving the missing reference to
+    // the literal "null") when <package> has no unique-identifier attribute.
+    const out = validateOpf(validPkg({ uniqueIdentifier: undefined }), emptyContainer(['EPUB/nav.xhtml']), '3.3')
+    const opf030 = out.find((m) => m.id === 'OPF-030')
+    expect(opf030?.message).toBe('The unique-identifier "null" was not found.')
+    expect(out.map((m) => m.id)).toContain('OPF-048')
+  })
   it('OPF-030 when unique-identifier does not match a dc:identifier id', () => {
     expect(ids(validPkg({ uniqueIdentifier: 'other' }))).toContain('OPF-030')
   })
