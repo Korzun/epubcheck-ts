@@ -132,6 +132,12 @@ describe('content details', () => {
     expect(incompleteExpected('metadata', ['dc:title', 'meta'], false)).toBe(
       'element "metadata" incomplete; expected element "dc:title" or "meta"',
     )
+    // textAllowed threads through to expectedClause just like unknownElement's does;
+    // unreachable in the OPF grammars today (a text model is nullable, so never
+    // "incomplete"), but pinned here for consistency between the two call sites.
+    expect(incompleteExpected('dc:title', [], true, true)).toBe(
+      'element "dc:title" incomplete; expected the element end-tag or text',
+    )
   })
   it('reports invalid character content', () => {
     expect(

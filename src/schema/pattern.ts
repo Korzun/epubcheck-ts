@@ -62,7 +62,7 @@ export function attribute(nc: NameClass, p: Pattern): Pattern {
  *
  * The unsafe form allocates a new closure (and a new `Pattern` object graph) on
  * every expansion, defeating identity-based cycle guards. The type system does
- * not enforce this — it is caller discipline. `grammarNames` backstops
+ * not enforce this — it is caller discipline. `walkGrammarElements` backstops
  * violations: it throws an actionable error rather than overflowing the stack.
  */
 export function ref(resolve: () => Pattern): Pattern {

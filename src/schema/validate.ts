@@ -379,7 +379,7 @@ export function validateAgainst(grammar: Grammar, root: XmlNode, path: string): 
       emit(node, invalidCharacterContent(qnameOf(node), inner.type.describe('')))
       return
     }
-    emit(node, incompleteExpected(qnameOf(node), expectedElements(inner), nullable(inner)))
+    emit(node, incompleteExpected(qnameOf(node), expectedElements(inner), nullable(inner), acceptsText(inner)))
   }
 
   childDeriv(grammar.root, root)
