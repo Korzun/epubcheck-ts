@@ -56,7 +56,14 @@ describe('attDeriv and startTagCloseDeriv', () => {
   })
   it('leaves a required-but-absent attribute non-nullable at close', () => {
     const open = startTagOpenDeriv(withId, undefined, 'e')
-    expect(nullable(startTagCloseDeriv(open))).toBe(false)
+    // nullable() is unconditionally false for an `after`-shaped pattern, so the
+    // check only discriminates once endTagDeriv has resolved the content model.
+    expect(nullable(endTagDeriv(startTagCloseDeriv(open)))).toBe(false)
+  })
+  it('is nullable at close once the required attribute has been supplied', () => {
+    const open = startTagOpenDeriv(withId, undefined, 'e')
+    const supplied = attDeriv(open, { qname: 'id', local: 'id', value: 'ok' })
+    expect(nullable(endTagDeriv(startTagCloseDeriv(supplied)))).toBe(true)
   })
   it('does not allow the same attribute to be consumed twice', () => {
     const open = startTagOpenDeriv(withId, undefined, 'e')
