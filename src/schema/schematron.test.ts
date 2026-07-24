@@ -32,10 +32,21 @@ describe('checkUniqueIds', () => {
     const messages = checkUniqueIds(doc('<p><a id="x"/><b id="x"/><c id="unique"/></p>'), 'p.opf')
     expect(messages).toHaveLength(2)
   })
+
+  it('does not flag ids differing only in case (case-sensitive comparison)', () => {
+    expect(checkUniqueIds(doc('<p><a id="X"/><b id="x"/></p>'), 'p.opf')).toEqual([])
+  })
+
+  it('flags a duplicate involving the root element itself', () => {
+    const messages = checkUniqueIds(doc('<package id="x"><item id="x"/></package>'), 'p.opf')
+    expect(messages).toHaveLength(2)
+  })
 })
 
 describe('checkDuplicateReferences', () => {
-  const guide = (refs: string) => doc(`<package><guide>${refs}</guide></package>`)
+  const OPF_NS = 'http://www.idpf.org/2007/opf'
+  const guide = (refs: string) =>
+    doc(`<package xmlns="${OPF_NS}"><guide>${refs}</guide></package>`)
 
   it('accepts distinct references', () => {
     expect(
@@ -81,5 +92,27 @@ describe('checkDuplicateReferences', () => {
         'p.opf',
       ),
     ).toEqual([])
+  })
+
+  it('ignores duplicate reference elements from a foreign namespace', () => {
+    const foreignNs = 'http://example.com/foreign'
+    const messages = checkDuplicateReferences(
+      doc(
+        `<package xmlns="${OPF_NS}" xmlns:f="${foreignNs}"><guide><f:reference type="text" href="a"/><f:reference type="text" href="a"/></guide></package>`,
+      ),
+      'p.opf',
+    )
+    expect(messages).toEqual([])
+  })
+
+  it('still flags OPF-namespaced duplicates alongside foreign-namespace ones', () => {
+    const foreignNs = 'http://example.com/foreign'
+    const messages = checkDuplicateReferences(
+      doc(
+        `<package xmlns="${OPF_NS}" xmlns:f="${foreignNs}"><guide><f:reference type="text" href="a"/><f:reference type="text" href="a"/><reference type="toc" href="b"/><reference type="toc" href="b"/></guide></package>`,
+      ),
+      'p.opf',
+    )
+    expect(messages).toHaveLength(2)
   })
 })
