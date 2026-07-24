@@ -137,7 +137,7 @@ git commit -m "feat: namespace-aware, document-ordered attributes on XmlNode"
 - Test: `src/schema/pattern.test.ts`
 
 **Interfaces:**
-- Produces: `Pattern`, `NameClass`, `Datatype`; constructors `empty`, `notAllowed`, `text`, `data`, `value`, `element`, `attribute`, `choice`, `group`, `interleave`, `oneOrMore`, `optional`, `after`, `ref`; `nullable(p)`, `deref(p)`, `nameMatches(nc, ns, local)`, `displayOf(nc)`.
+- Produces: `Pattern`, `NameClass`, `Datatype`; constants `EMPTY`, `NOT_ALLOWED`, `TEXT`; constructors `name`, `anyNameExcept`, `data`, `element`, `attribute`, `ref`, `choice`, `group`, `interleave`, `oneOrMore`, `optional`, `zeroOrMore`, `seq`, `all`, `after`; `nullable(p)`, `deref(p)`, `nameMatches(nc, ns, local)`, `displayOf(nc)`. (RelaxNG `<value>` is modelled in Task 3 as `data(dtEnum([...]))`, so there is no separate `value` constructor.)
 
 - [ ] **Step 1: Write the failing test**
 
