@@ -1,4 +1,5 @@
 import type { Datatype } from './pattern.js'
+import { joinOr, quoteAll } from './messages.js'
 
 /**
  * Datatypes used by opf20.rng and package-30.rnc. `describe` returns the tail of
@@ -41,11 +42,7 @@ export const DT_NON_EMPTY: Datatype = {
 /** A RelaxNG `<choice>` of `<value>`s. Alternatives are listed alphabetically. */
 export function dtEnum(values: readonly string[]): Datatype {
   const sorted = [...values].sort()
-  const quoted = sorted.map((v) => `"${v}"`)
-  const tail =
-    quoted.length < 2
-      ? quoted.join('')
-      : `${quoted.slice(0, -1).join(', ')} or ${quoted[quoted.length - 1]}`
+  const tail = joinOr(quoteAll(sorted))
   return {
     allows: (v) => sorted.includes(v),
     describe: () => `equal to ${tail}`,
