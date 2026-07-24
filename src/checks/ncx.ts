@@ -105,12 +105,12 @@ function checkReferences(
     if (src === undefined || isRemote(src) || hasScheme(src)) continue // remote hyperlinks are allowed
     const target = resolvePath(ncx.path, src)
     if (!getResource(container, target)) {
-      messages.push(msg('RSC-007', np.loc, src))
+      messages.push(msg('RSC-007', np.loc, target))
       continue
     }
     const item = manifest.get(target)
     if (item === undefined) {
-      messages.push(msg('RSC-008', np.loc, src))
+      messages.push(msg('RSC-008', np.loc, target))
       continue
     }
     if (!isBlessedContent(item.mediaType) && !hasFallbackTo(item, byId, (i) => isBlessedContent(i.mediaType))) {

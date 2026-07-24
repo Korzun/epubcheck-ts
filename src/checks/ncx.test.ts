@@ -125,6 +125,8 @@ describe('validateNcx', () => {
       '2.0',
     )
     expect(m.map((x) => x.id)).toEqual(['RSC-007'])
+    // epubcheck embeds the NCX-directory-resolved path, not the raw src.
+    expect(m[0]?.message).toBe('Referenced resource "EPUB/ghost.xhtml" could not be found in the EPUB.')
   })
 
   it('RSC-008 for a src present in the zip but undeclared', () => {
@@ -138,6 +140,7 @@ describe('validateNcx', () => {
       '2.0',
     )
     expect(m.map((x) => x.id)).toEqual(['RSC-008'])
+    expect(m[0]?.message).toBe('Referenced resource "EPUB/extra.xhtml" is not declared in the OPF manifest.')
   })
 
   it('RSC-010 for a src to a non-content-document (v2 blessed set)', () => {
