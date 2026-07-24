@@ -128,4 +128,13 @@ describe('grammarNames', () => {
     const names = grammarNames(collectionPattern())
     expect(names).toEqual(new Set(['collection']))
   })
+  it('throws an actionable error when a ref thunk wraps the recursive call in a fresh arrow', () => {
+    // Neither cycle guard can fire here: `ref(() => collectionPattern())` allocates a
+    // fresh closure AND a fresh Pattern object graph on every expansion. This must not
+    // silently stack-overflow; it must fail loudly with guidance on how to fix it.
+    function collectionPattern(): import('./pattern.js').Pattern {
+      return element(N('collection'), optional(ref(() => collectionPattern())))
+    }
+    expect(() => grammarNames(collectionPattern())).toThrow(/memoi/i)
+  })
 })

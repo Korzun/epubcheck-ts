@@ -143,39 +143,76 @@ function collectRequired(p: Pattern, out: Set<string>, want: 'element' | 'attrib
  *    until the stack overflows. `resolve` itself is a stable function
  *    reference (a named function or a module-level const arrow), so tracking
  *    it terminates for both construction styles.
+ *
+ * Both guards are defeated by wrapping the recursive call in a fresh arrow, e.g.
+ * `ref(() => collectionPattern())`: that allocates a new `Pattern` AND a new
+ * closure on every expansion, so neither `seen` nor `seenThunks` ever re-hits.
+ * `REF_EXPANSION_LIMIT` below is a backstop for exactly that case: it turns an
+ * eventual stack overflow (which gives no hint what to fix) into an immediate,
+ * actionable error.
+ *
+ * The walk itself is written with an explicit worklist array rather than
+ * recursive calls, on purpose: a runaway `ref` chain is a linear structure
+ * (ref -> choice -> ref -> choice -> ...), so a recursive walk's native call
+ * stack would grow one frame per expansion and hit the JS engine's own stack
+ * limit (a bare RangeError, no message) at only a few thousand expansions —
+ * well before `REF_EXPANSION_LIMIT` is reached. The explicit stack keeps
+ * native call depth flat regardless of how many expansions occur, so the
+ * counter above is what actually fires.
  */
+/**
+ * Max `ref` expansions before `grammarNames` gives up and throws. Real grammars
+ * expand a `ref` a few dozen times at most, so this can only trip on a `ref`
+ * thunk that keeps producing fresh patterns (unbounded genuine recursion).
+ */
+const REF_EXPANSION_LIMIT = 10000
+
 export function grammarNames(root: Pattern): Set<string> {
   const out = new Set<string>()
   const seen = new Set<Pattern>()
   const seenThunks = new Set<() => Pattern>()
-  const walk = (p: Pattern): void => {
-    if (seen.has(p)) return
+  let refExpansions = 0
+  const stack: Pattern[] = [root]
+  while (stack.length > 0) {
+    const p = stack.pop()!
+    if (seen.has(p)) continue
     seen.add(p)
     if (p.k === 'ref') {
-      if (seenThunks.has(p.resolve)) return
+      if (seenThunks.has(p.resolve)) continue
       seenThunks.add(p.resolve)
+      refExpansions++
+      if (refExpansions > REF_EXPANSION_LIMIT) {
+        throw new Error(
+          'grammarNames: a ref thunk keeps producing fresh patterns, so no cycle guard ' +
+            'can fire (object identity and resolve-function identity are both defeated by ' +
+            'a new object graph on every call). This usually means a recursive production ' +
+            'was written as `ref(() => builder())`, wrapping the recursive call in a fresh ' +
+            'arrow on every expansion. Fix it by memoizing the recursive production as a ' +
+            'module-level `const` (a memoized cell), or by passing the builder function ' +
+            'directly to ref, e.g. `ref(builder)` instead of `ref(() => builder())`.',
+        )
+      }
     }
     const d = deref(p)
     switch (d.k) {
       case 'element':
         out.add(displayOf(d.name))
-        walk(d.p)
-        return
+        stack.push(d.p)
+        break
       case 'attribute':
-        return
+        break
       case 'choice':
       case 'group':
       case 'interleave':
       case 'after':
-        walk(d.p1)
-        walk(d.p2)
-        return
+        stack.push(d.p1)
+        stack.push(d.p2)
+        break
       case 'oneOrMore':
-        walk(d.p)
-        return
+        stack.push(d.p)
+        break
       default:
     }
   }
-  walk(root)
   return out
 }

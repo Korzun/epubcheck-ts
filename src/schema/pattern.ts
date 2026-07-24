@@ -52,11 +52,18 @@ export function attribute(nc: NameClass, p: Pattern): Pattern {
   return { k: 'attribute', name: nc, p }
 }
 /**
- * `resolve` is NOT required to return a stable object: a self-recursive builder
- * function (as opposed to a memoized cell) will build a fresh object graph on
- * every call. Traversals over `Pattern` must guard against this — identity-based
- * "seen" tracking of the resolved objects is not enough on its own; also track
- * the identity of `resolve` itself, which is stable across calls.
+ * `resolve` is called lazily to break a cycle in a recursive grammar production.
+ * Callers MUST pass a stable function reference: either a memoized cell (a
+ * module-level `const` closing over the built pattern) or the recursive builder
+ * function itself, passed directly:
+ *
+ *   const p = ref(collectionPattern)          // safe: stable function reference
+ *   const p = ref(() => collectionPattern())   // UNSAFE: fresh arrow every call
+ *
+ * The unsafe form allocates a new closure (and a new `Pattern` object graph) on
+ * every expansion, defeating identity-based cycle guards. The type system does
+ * not enforce this — it is caller discipline. `grammarNames` backstops
+ * violations: it throws an actionable error rather than overflowing the stack.
  */
 export function ref(resolve: () => Pattern): Pattern {
   return { k: 'ref', resolve }
