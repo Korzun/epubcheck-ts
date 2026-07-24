@@ -7,13 +7,30 @@ export interface Expected {
 }
 export interface Fixture {
   name: string
-  area: 'ocf' | 'opf' | 'nav' | 'content' | 'css' | 'ncx'
+  area: 'ocf' | 'opf' | 'nav' | 'content' | 'css' | 'ncx' | 'opf2-schema' | 'opf3-schema'
   description: string
   epub: Uint8Array
   expected: Expected[]
 }
 
 const E = (id: string, severity: Severity): Expected => ({ id, severity })
+
+const SCHEMA_NS =
+  'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf" ' +
+  'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
+
+/** OPF2 with opf:/xsi: declared, then `find` replaced by `repl`. Mirrors test/differential/cases.ts's `opf2`. */
+function schemaEpub2(find: string, repl: string): Uint8Array {
+  const base = OPF2.replace('xmlns:dc="http://purl.org/dc/elements/1.1/"', SCHEMA_NS)
+  if (!base.includes(find)) throw new Error(`OPF2 does not contain: ${find}`)
+  return buildEpub2({ files: { 'EPUB/package.opf': base.replace(find, repl) } })
+}
+
+const S_TITLE = '<dc:title>Title</dc:title>'
+const S_IDENT = '<dc:identifier id="uid">urn:uuid:00000000-0000-0000-0000-000000000000</dc:identifier>'
+const S_LANG = '<dc:language>en</dc:language>'
+const S_ITEM = '<item id="content" href="content_001.xhtml" media-type="application/xhtml+xml"/>'
+const S_GUIDE = '<guide><reference type="text" title="Text" href="content_001.xhtml"/></guide>'
 
 export const CORPUS: Fixture[] = [
   // ---- baseline ----
@@ -830,5 +847,263 @@ export const CORPUS: Fixture[] = [
       },
     }),
     expected: [E('NCX-001', 'ERROR')],
+  },
+
+  // ---- OPF 2.0 content model (schema layer) ----
+  {
+    name: 'realistic calibre metadata is clean',
+    area: 'opf2-schema',
+    description: 'calibre-style opf:file-as/opf:role and a bare-year dc:date produce no false positives (valid)',
+    epub: schemaEpub2(
+      `${S_IDENT}${S_TITLE}${S_LANG}`,
+      `${S_TITLE}<dc:creator opf:file-as="Doe, Jane" opf:role="aut">Jane Doe</dc:creator>` +
+        `<dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (3.48.0)</dc:contributor>` +
+        `<dc:date>2019-01-01T00:00:00+00:00</dc:date>${S_LANG}` +
+        `<dc:identifier id="uid" opf:scheme="uuid">urn:uuid:00000000-0000-0000-0000-000000000000</dc:identifier>` +
+        `<meta name="calibre:timestamp" content="2019-01-01T00:00:00+00:00"/>` +
+        `<meta name="cover" content="content"/>`,
+    ),
+    expected: [],
+  },
+  {
+    name: 'realistic sigil metadata is clean',
+    area: 'opf2-schema',
+    description: 'Sigil-style dc:creator/dc:date/dc:rights/dc:subject metadata produces no false positives (valid)',
+    epub: schemaEpub2(
+      `${S_IDENT}${S_TITLE}${S_LANG}`,
+      `${S_IDENT}${S_TITLE}${S_LANG}<dc:creator opf:role="aut">Jane Doe</dc:creator>` +
+        `<dc:publisher>Pub</dc:publisher><dc:date opf:event="publication">2019</dc:date>` +
+        `<dc:rights>All rights reserved</dc:rights><dc:subject>Fiction</dc:subject>`,
+    ),
+    expected: [],
+  },
+  {
+    name: 'foreign-namespace metadata child is clean',
+    area: 'opf2-schema',
+    description: 'a foreign-namespace element (e.g. dcterms:modified) inside metadata matches the wildcard (valid)',
+    epub: schemaEpub2(S_TITLE, `${S_TITLE}<dcterms:modified xmlns:dcterms="http://purl.org/dc/terms/">2019-01-01T00:00:00Z</dcterms:modified>`),
+    expected: [],
+  },
+  {
+    name: 'metadata children in any order are clean',
+    area: 'opf2-schema',
+    description: 'dc:identifier/dc:title/dc:language may appear in any order in OPF 2.0 metadata (valid)',
+    epub: schemaEpub2(`${S_IDENT}${S_TITLE}${S_LANG}`, `${S_LANG}${S_TITLE}${S_IDENT}`),
+    expected: [],
+  },
+  {
+    name: 'unknown guide reference type is clean',
+    area: 'opf2-schema',
+    description: 'guide reference@type accepts any string, so an unrecognised value is schema-valid (valid)',
+    epub: schemaEpub2(S_GUIDE, '<guide><reference type="banana" href="content_001.xhtml"/></guide>'),
+    expected: [],
+  },
+  {
+    name: 'tours are clean',
+    area: 'opf2-schema',
+    description: 'a well-formed tours/tour/site block is schema-valid (valid)',
+    epub: schemaEpub2(
+      S_GUIDE,
+      `<tours><tour id="t1" title="Tour"><site title="S" href="content_001.xhtml"/></tour></tours>${S_GUIDE}`,
+    ),
+    expected: [],
+  },
+  {
+    name: 'opf:file-as on dc:title is rejected',
+    area: 'opf2-schema',
+    description: 'opf:file-as is not allowed on dc:title, only on dc:creator/dc:contributor (epubcheck RSC-005)',
+    epub: schemaEpub2(S_TITLE, '<dc:title opf:file-as="Title, The">Title</dc:title>'),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'dc:language xml:lang is rejected',
+    area: 'opf2-schema',
+    description: 'dc:language does not accept xml:lang, unlike the other rich dc:* elements (epubcheck RSC-005)',
+    epub: schemaEpub2(S_LANG, '<dc:language xml:lang="en">en</dc:language>'),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'empty dc:identifier is rejected',
+    area: 'opf2-schema',
+    description:
+      'an empty dc:identifier fails its non-empty-string content model (epubcheck RSC-005). A second, ' +
+      'unlabelled dc:identifier is left empty rather than the unique-identifier one, so the fixture isolates ' +
+      'the content-model failure from the unrelated NCX-001 identifier-match check (see task report).',
+    epub: schemaEpub2(S_IDENT, `${S_IDENT}<dc:identifier></dc:identifier>`),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'missing dc:title is reported once',
+    area: 'opf2-schema',
+    description: 'metadata with no dc:title reports exactly one missing-required-element message (epubcheck RSC-005)',
+    epub: schemaEpub2(S_TITLE, ''),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'item properties attribute is rejected',
+    area: 'opf2-schema',
+    description: 'the OPF 2.0 item element has no properties attribute — that is an EPUB 3 addition (epubcheck RSC-005)',
+    epub: schemaEpub2(S_ITEM, S_ITEM.replace('/>', ' properties="nav"/>')),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'itemref linear value is enumerated',
+    area: 'opf2-schema',
+    description: 'itemref@linear only accepts "yes"/"no" (epubcheck RSC-005)',
+    epub: schemaEpub2('<itemref idref="content"/>', '<itemref idref="content" linear="maybe"/>'),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'spine missing toc',
+    area: 'opf2-schema',
+    description: 'the EPUB 2 spine requires a toc attribute (epubcheck RSC-005)',
+    epub: schemaEpub2('<spine toc="ncx">', '<spine>'),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'guide reference missing type',
+    area: 'opf2-schema',
+    description: 'guide reference requires a type attribute (epubcheck RSC-005)',
+    epub: schemaEpub2(S_GUIDE, '<guide><reference title="T" href="content_001.xhtml"/></guide>'),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'tour missing title',
+    area: 'opf2-schema',
+    description: 'tour requires a title attribute (epubcheck RSC-005)',
+    epub: schemaEpub2(
+      S_GUIDE,
+      `<tours><tour><site title="S" href="content_001.xhtml"/></tour></tours>${S_GUIDE}`,
+    ),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'duplicate guide reference warns',
+    area: 'opf2-schema',
+    description:
+      'two guide references sharing type+href warn once per participating element (epubcheck RSC-017); ' +
+      'the jar aggregates the pair into one message with two locations, which the multiset here expands to two',
+    epub: schemaEpub2(
+      S_GUIDE,
+      '<guide><reference type="text" title="T" href="content_001.xhtml"/>' +
+        '<reference type="TEXT" title="T2" href="content_001.xhtml"/></guide>',
+    ),
+    expected: [E('RSC-017', 'WARNING'), E('RSC-017', 'WARNING')],
+  },
+  {
+    name: 'guide before spine breaks package order',
+    area: 'opf2-schema',
+    description:
+      'guide arriving before the required spine is reported as premature, and the spine that follows finds ' +
+      'nothing left to expect but its own end-tag (epubcheck RSC-005 x2)',
+    epub: schemaEpub2(
+      `<spine toc="ncx"><itemref idref="content"/></spine>${S_GUIDE}`,
+      `${S_GUIDE}<spine toc="ncx"><itemref idref="content"/></spine>`,
+    ),
+    expected: [E('RSC-005', 'ERROR'), E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'package epub3 i18n attrs on an OPF 2.0 package is rejected',
+    area: 'opf2-schema',
+    description: 'dir/xml:lang on package are an EPUB 3 addition, not present in the OPF 2.0 package content model (epubcheck RSC-005 x2)',
+    epub: schemaEpub2('version="2.0"', 'version="2.0" dir="ltr" xml:lang="en"'),
+    expected: [E('RSC-005', 'ERROR'), E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'dc:creator unprefixed role is rejected',
+    area: 'opf2-schema',
+    description: 'dc:creator only accepts the opf:role attribute, not a bare unprefixed role (epubcheck RSC-005)',
+    epub: schemaEpub2(S_TITLE, `${S_TITLE}<dc:creator role="aut">J D</dc:creator>`),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+
+  // ---- package-30 content model (schema layer) ----
+  {
+    name: 'legacy name/content meta is clean in EPUB 3',
+    area: 'opf3-schema',
+    description: 'the OPF 2.0 style name/content meta form is still accepted alongside EPUB 3 property meta (valid)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace('</metadata>', '<meta name="cover" content="content"/></metadata>'),
+      },
+    }),
+    expected: [],
+  },
+  {
+    name: 'metadata link is clean',
+    area: 'opf3-schema',
+    description:
+      'a well-formed metadata link element is schema-valid (valid). The jar additionally emits OPF-028 ' +
+      '(undeclared "cc" prefix) here, which we do not implement, so our expected output stays empty.',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace(
+          '</metadata>',
+          '<link rel="cc:license" href="http://example.com/l"/></metadata>',
+        ),
+      },
+    }),
+    expected: [],
+  },
+  {
+    name: 'page-progression-direction is clean',
+    area: 'opf3-schema',
+    description: 'spine@page-progression-direction is a valid EPUB 3 attribute (valid)',
+    epub: buildEpub({
+      files: { 'EPUB/package.opf': OPF.replace('<spine>', '<spine page-progression-direction="rtl">') },
+    }),
+    expected: [],
+  },
+  {
+    name: 'unknown attribute on item is rejected',
+    area: 'opf3-schema',
+    description: 'an unrecognised attribute on manifest item is rejected (epubcheck RSC-005)',
+    epub: buildEpub({
+      files: { 'EPUB/package.opf': OPF.replace('properties="nav"', 'properties="nav" bogus="x"') },
+    }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'dir outside its enumeration is rejected',
+    area: 'opf3-schema',
+    description: 'dir only accepts "ltr", "rtl" or "auto" (epubcheck RSC-005)',
+    epub: buildEpub({
+      files: { 'EPUB/package.opf': OPF.replace('<dc:title>Title</dc:title>', '<dc:title dir="sideways">Title</dc:title>') },
+    }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'epub3 itemref linear value is enumerated',
+    area: 'opf3-schema',
+    description: 'itemref@linear only accepts "yes"/"no" in package-30 too (epubcheck RSC-005)',
+    epub: buildEpub({
+      files: { 'EPUB/package.opf': OPF.replace('<itemref idref="content"/>', '<itemref idref="content" linear="maybe"/>') },
+    }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'epub3 meta unknown attribute is rejected',
+    area: 'opf3-schema',
+    description: 'an unrecognised attribute on an EPUB 3 property meta is rejected (epubcheck RSC-005)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace(
+          '<meta property="dcterms:modified">2020-01-01T00:00:00Z</meta>',
+          '<meta property="dcterms:modified" bogus="x">2020-01-01T00:00:00Z</meta>',
+        ),
+      },
+    }),
+    expected: [E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'epub3 link missing rel is rejected',
+    area: 'opf3-schema',
+    description: 'metadata link requires a rel attribute (epubcheck RSC-005)',
+    epub: buildEpub({
+      files: {
+        'EPUB/package.opf': OPF.replace('</metadata>', '<link href="http://example.com/l"/></metadata>'),
+      },
+    }),
+    expected: [E('RSC-005', 'ERROR')],
   },
 ]
