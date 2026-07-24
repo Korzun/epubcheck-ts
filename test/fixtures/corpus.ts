@@ -132,11 +132,11 @@ export const CORPUS: Fixture[] = [
     area: 'opf',
     description: 'package has no unique-identifier attribute (epubcheck OPF-048 + RSC-005)',
     epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace(' unique-identifier="uid"', '') } }),
-    // The schema layer now also reports the RNG failure the jar emits alongside
-    // OPF-048: element "package" missing required attribute "unique-identifier".
-    // (The jar additionally emits OPF-030 with a "null" identifier here, which our
-    // OPF-030 logic does not — a pre-existing gap unrelated to the schema wiring.)
-    expected: [E('OPF-048', 'ERROR'), E('RSC-005', 'ERROR')],
+    // The jar emits three errors for a missing unique-identifier attribute:
+    // OPF-048 (missing attribute), OPF-030 resolving the missing reference to the
+    // literal "null", and the schema layer's RNG failure — element "package"
+    // missing required attribute "unique-identifier".
+    expected: [E('OPF-030', 'ERROR'), E('OPF-048', 'ERROR'), E('RSC-005', 'ERROR')],
   },
   {
     name: 'opf-manifest-item-missing-file',
@@ -766,9 +766,9 @@ export const CORPUS: Fixture[] = [
   {
     name: 'opf2-toc-not-ncx',
     area: 'opf',
-    description: 'spine toc idref resolves to a non-NCX item (epubcheck OPF-050); the XHTML then fails NCX structure (RSC-005)',
+    description: 'spine toc idref resolves to a non-NCX item (epubcheck OPF-050); the non-NCX target is not parsed as an NCX (jar emits CHK-008 + OPF-050, no navMap RSC-005)',
     epub: buildEpub2({ files: { 'EPUB/package.opf': OPF2.replace('<spine toc="ncx">', '<spine toc="content">') } }),
-    expected: [E('OPF-050', 'ERROR'), E('RSC-005', 'ERROR')],
+    expected: [E('OPF-050', 'ERROR')],
   },
   {
     name: 'opf2-meta-property',

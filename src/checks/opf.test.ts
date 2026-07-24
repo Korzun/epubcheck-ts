@@ -49,6 +49,14 @@ describe('validateOpf — package level', () => {
   it('OPF-048 when unique-identifier attribute is absent', () => {
     expect(ids(validPkg({ uniqueIdentifier: undefined }))).toContain('OPF-048')
   })
+  it('OPF-030 with "null" when unique-identifier attribute is absent (jar parity)', () => {
+    // epubcheck emits BOTH OPF-048 and OPF-030 (resolving the missing reference to
+    // the literal "null") when <package> has no unique-identifier attribute.
+    const out = validateOpf(validPkg({ uniqueIdentifier: undefined }), emptyContainer(['EPUB/nav.xhtml']), '3.3')
+    const opf030 = out.find((m) => m.id === 'OPF-030')
+    expect(opf030?.message).toBe('The unique-identifier "null" was not found.')
+    expect(out.map((m) => m.id)).toContain('OPF-048')
+  })
   it('OPF-030 when unique-identifier does not match a dc:identifier id', () => {
     expect(ids(validPkg({ uniqueIdentifier: 'other' }))).toContain('OPF-030')
   })
@@ -208,18 +216,53 @@ describe('EPUB 2 rules', () => {
     expect(messages.some((m) => m.message.includes('dcterms:modified'))).toBe(true)
   })
 
-  it('OPF-031: guide reference to an undeclared file', () => {
+  it('OPF-031: guide reference to an undeclared file (container-resolved path)', () => {
     const ref: GuideReference = { type: 'text', href: 'nowhere.xhtml', loc: LOC }
     const pkg = validPkg2({ guide: [ref] })
-    expect(ids(validateOpf(pkg, container2, '2.0'))).toContain('OPF-031')
+    const out = validateOpf(pkg, container2, '2.0')
+    const m = out.find((x) => x.id === 'OPF-031')
+    // epubcheck embeds the OPF-directory-resolved path, not the raw href.
+    expect(m?.message).toBe('File listed in reference element in guide was not declared in OPF manifest: EPUB/nowhere.xhtml.')
   })
 
-  it('OPF-032: guide reference to a non-content-document type', () => {
+  it('OPF-032: guide reference to a core non-content type resolves the path and does not add RSC-032', () => {
     const imageItem: ManifestItem = { id: 'cover', href: 'cover.gif', mediaType: 'image/gif', properties: [], loc: LOC }
     const ref: GuideReference = { type: 'cover', href: 'cover.gif', loc: LOC }
     const pkg = validPkg2({ manifest: [ncxItem, contentItem, imageItem], guide: [ref] })
     const container = emptyContainer(['EPUB/toc.ncx', 'EPUB/content.xhtml', 'EPUB/cover.gif'])
-    expect(ids(validateOpf(pkg, container, '2.0'))).toContain('OPF-032')
+    const out = validateOpf(pkg, container, '2.0')
+    const m = out.find((x) => x.id === 'OPF-032')
+    expect(m?.message).toBe('Guide references "EPUB/cover.gif" which is not a valid "OPS Content Document".')
+    // image/gif is an EPUB 2 Core Media Type, not a foreign resource: no RSC-032.
+    expect(out.map((x) => x.id)).not.toContain('RSC-032')
+  })
+
+  it('OPF-043 with "undefined": spine item with an absent media-type has no fallback', () => {
+    const noType: ManifestItem = { id: 'content', href: 'content.xhtml', mediaType: undefined, properties: [], loc: LOC }
+    const pkg = validPkg2({ manifest: [ncxItem, noType] })
+    const out = validateOpf(pkg, container2, '2.0')
+    const m = out.find((x) => x.id === 'OPF-043')
+    expect(m?.message).toBe('Spine item with non-standard media-type "undefined" has no fallback.')
+  })
+
+  it('RSC-032 with "undefined": guide reference to a foreign (typeless) resource, no fallback', () => {
+    // content item declared but with no media-type -> foreign; guide references it.
+    const noType: ManifestItem = { id: 'content', href: 'content.xhtml', mediaType: undefined, properties: [], loc: LOC }
+    const ref: GuideReference = { type: 'text', href: 'content.xhtml', loc: LOC }
+    const pkg = validPkg2({ manifest: [ncxItem, noType], guide: [ref] })
+    const out = validateOpf(pkg, container2, '2.0')
+    const m = out.find((x) => x.id === 'RSC-032')
+    expect(m?.message).toBe('Fallback must be provided for foreign resources, but found none for resource "EPUB/content.xhtml" of type "undefined".')
+  })
+
+  it('RSC-032 for a foreign guide target (PDF) but not for a core one', () => {
+    const pdf: ManifestItem = { id: 'pdf', href: 'doc.pdf', mediaType: 'application/pdf', properties: [], loc: LOC }
+    const ref: GuideReference = { type: 'text', href: 'doc.pdf', loc: LOC }
+    const pkg = validPkg2({ manifest: [ncxItem, contentItem, pdf], guide: [ref] })
+    const container = emptyContainer(['EPUB/toc.ncx', 'EPUB/content.xhtml', 'EPUB/doc.pdf'])
+    const out = validateOpf(pkg, container, '2.0').map((x) => x.id)
+    expect(out).toContain('OPF-032')
+    expect(out).toContain('RSC-032')
   })
 
   it('OPF-034: duplicate spine idref', () => {

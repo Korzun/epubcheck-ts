@@ -80,6 +80,20 @@ describe('validateNcx', () => {
     expect(m.map((x) => x.id)).toEqual(['NCX-004'])
   })
 
+  it('no NCX-001 when the OPF unique identifier is empty (jar parity)', () => {
+    // An empty dc:identifier resolves the OPF id to "" and is already reported as
+    // RSC-005 by the schema layer; epubcheck does not additionally flag an NCX
+    // mismatch against a blank OPF identifier.
+    const ncx = baseNcx()
+    const { pkg2, container } = baseSetup()
+    const emptyIdPkg: PackageDocument = {
+      ...pkg2,
+      metadata: { ...pkg2.metadata, identifiers: [{ id: 'uid', value: '' }] },
+    }
+    const m = validateNcx({ ...ncx, uid: 'urn:uuid:x' }, emptyIdPkg, container, '2.0')
+    expect(m.map((x) => x.id)).not.toContain('NCX-001')
+  })
+
   it('NCX-006 per empty text label', () => {
     const ncx = baseNcx()
     const { pkg2, container } = baseSetup()
@@ -111,6 +125,8 @@ describe('validateNcx', () => {
       '2.0',
     )
     expect(m.map((x) => x.id)).toEqual(['RSC-007'])
+    // epubcheck embeds the NCX-directory-resolved path, not the raw src.
+    expect(m[0]?.message).toBe('Referenced resource "EPUB/ghost.xhtml" could not be found in the EPUB.')
   })
 
   it('RSC-008 for a src present in the zip but undeclared', () => {
@@ -124,6 +140,7 @@ describe('validateNcx', () => {
       '2.0',
     )
     expect(m.map((x) => x.id)).toEqual(['RSC-008'])
+    expect(m[0]?.message).toBe('Referenced resource "EPUB/extra.xhtml" is not declared in the OPF manifest.')
   })
 
   it('RSC-010 for a src to a non-content-document (v2 blessed set)', () => {

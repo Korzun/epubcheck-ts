@@ -141,10 +141,22 @@ export const KNOWN_UNIMPLEMENTED = new Set<string>([
   'OPF-028',
 ])
 
-/** Compare id, severity and wording as an order-insensitive multiset. */
+/**
+ * Compare id, severity and wording as an order-insensitive multiset.
+ *
+ * USAGE-severity messages are dropped from BOTH sides. EPUBCheck's default report
+ * omits USAGE entirely — those messages are opt-in behind its `--usage` flag, which
+ * the harness does not pass — whereas epubcheck-ts always emits them (consumers filter
+ * by threshold). Comparing at the jar's default reporting level keeps the multiset
+ * apples-to-apples; e.g. our (correct) OPF-003 for an undeclared resource, which the
+ * jar reports only under `--usage`, must not count as a divergence. This mirrors the
+ * jar-side KNOWN_UNIMPLEMENTED filter: a systematic reporting difference, not a
+ * per-message exception.
+ */
 export async function diffCase(c: DiffCase): Promise<CaseResult> {
-  const jar = runJar(c.epub).filter((m) => !KNOWN_UNIMPLEMENTED.has(m.id))
-  const ts = await runTs(c.epub)
+  const notUsage = (m: Emitted): boolean => m.severity !== 'USAGE'
+  const jar = runJar(c.epub).filter((m) => !KNOWN_UNIMPLEMENTED.has(m.id)).filter(notUsage)
+  const ts = (await runTs(c.epub)).filter(notUsage)
   const key = (e: Emitted): string => `${e.severity} ${e.id} ${e.message}`
   const a = jar.map(key).sort()
   const b = ts.map(key).sort()

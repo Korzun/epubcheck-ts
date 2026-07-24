@@ -59,9 +59,12 @@ function checkPackage(pkg: PackageDocument, version: EpubVersion | undefined): M
     messages.push(msg('OPF-001', loc, `unsupported version "${pkg.version}"`))
   }
 
-  // unique-identifier attribute + resolution
+  // unique-identifier attribute + resolution. An absent attribute yields both
+  // OPF-048 (missing attribute) and OPF-030 with the literal "null" — matching
+  // epubcheck, which resolves the missing reference to a null id.
   if (!pkg.uniqueIdentifier) {
     messages.push(msg('OPF-048', loc))
+    messages.push(msg('OPF-030', loc, 'null'))
   } else if (!pkg.metadata.identifiers.some((i) => i.id === pkg.uniqueIdentifier)) {
     messages.push(msg('OPF-030', loc, pkg.uniqueIdentifier))
   }
@@ -154,6 +157,16 @@ function checkEpub2(pkg: PackageDocument, version: EpubVersion | undefined): Mes
   const blessed = blessedContentTypes(version)
   const isBlessedContent = (mediaType: string | undefined): boolean =>
     mediaType !== undefined && blessed.has(mediaType)
+  // A "foreign" resource is one whose media type is not an EPUB 2 Core Media Type
+  // (content docs, images, style sheets, or the NCX). An absent media type is
+  // foreign. epubcheck requires a fallback for these (RSC-032); core types such as
+  // images and CSS are accepted without one.
+  const isForeign = (mediaType: string | undefined): boolean =>
+    mediaType === undefined ||
+    !(isBlessedContent(mediaType) ||
+      EPUB2_IMAGE_TYPES.has(mediaType) ||
+      EPUB2_STYLE_TYPES.has(mediaType) ||
+      mediaType === NCX_MEDIA_TYPE)
 
   const byId = new Map<string, ManifestItem>()
   for (const item of pkg.manifest) {
@@ -178,15 +191,17 @@ function checkEpub2(pkg: PackageDocument, version: EpubVersion | undefined): Mes
     seenIdrefs.add(ref.idref)
 
     const item = byId.get(ref.idref)
-    const mediaType = item?.mediaType
-    if (item === undefined || mediaType === undefined) continue // unknown idref → OPF-049 elsewhere
-    if (EPUB2_STYLE_TYPES.has(mediaType) || EPUB2_IMAGE_TYPES.has(mediaType)) {
+    if (item === undefined) continue // unknown idref → OPF-049 elsewhere
+    // An absent media-type is non-standard and rendered by epubcheck as the
+    // literal "undefined" (OPF-043/OPF-044).
+    const mediaType = item.mediaType
+    if (mediaType !== undefined && (EPUB2_STYLE_TYPES.has(mediaType) || EPUB2_IMAGE_TYPES.has(mediaType))) {
       messages.push(msg('OPF-042', item.loc, mediaType))
     } else if (!isBlessedContent(mediaType)) {
       if (item.fallback === undefined) {
-        messages.push(msg('OPF-043', item.loc, mediaType))
+        messages.push(msg('OPF-043', item.loc, mediaType ?? 'undefined'))
       } else if (!hasFallbackTo(item, byId, (i) => isBlessedContent(i.mediaType))) {
-        messages.push(msg('OPF-044', item.loc, mediaType))
+        messages.push(msg('OPF-044', item.loc, mediaType ?? 'undefined'))
       }
     }
   }
@@ -203,15 +218,21 @@ function checkEpub2(pkg: PackageDocument, version: EpubVersion | undefined): Mes
     }
   }
 
-  // Guide references (epubcheck OPFChecker.checkGuide).
+  // Guide references (epubcheck OPFChecker.checkGuide). The messages embed the
+  // container-resolved path, not the raw href (epubcheck parity). A guide
+  // reference to a foreign resource with no content-document fallback is also a
+  // generic hyperlink to a foreign resource, so it additionally yields RSC-032.
   for (const ref of pkg.guide) {
     if (ref.href === undefined || isRemote(ref.href)) continue
     const target = resolvePath(pkg.path, ref.href)
     const item = declared.get(target)
     if (item === undefined) {
-      messages.push(msg('OPF-031', ref.loc, ref.href))
+      messages.push(msg('OPF-031', ref.loc, target))
     } else if (!isBlessedContent(item.mediaType)) {
-      messages.push(msg('OPF-032', ref.loc, ref.href))
+      messages.push(msg('OPF-032', ref.loc, target))
+      if (isForeign(item.mediaType) && !hasFallbackTo(item, byId, (i) => !isForeign(i.mediaType))) {
+        messages.push(msg('RSC-032', ref.loc, target, item.mediaType ?? 'undefined'))
+      }
     }
   }
 

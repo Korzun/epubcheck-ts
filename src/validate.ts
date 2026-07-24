@@ -75,14 +75,16 @@ export async function validateEpub(
         for (const item of pkg.manifest) {
           if (item.id !== undefined) byId.set(item.id, item)
         }
-        // The spine toc idref locates the NCX regardless of its media type
-        // (epubcheck parity): if it points at a non-NCX item, that item is still
-        // parsed as the NCX (surfacing a structural RSC-005) and OPF-050 is
-        // reported separately by validateOpf. Do not media-type-gate this lookup.
+        // The spine toc idref locates the NCX; failing that, media-type discovery
+        // finds it. Only parse the resolved item as an NCX when it actually has the
+        // NCX media type: if the toc points at a non-NCX item (a duplicate id that
+        // resolves to a content doc, or a plain mistyped toc), epubcheck reports
+        // OPF-050 (from validateOpf) and skips the NCX parse rather than parsing a
+        // non-NCX document and emitting a spurious structural RSC-005.
         const ncxItem =
           (pkg.spineToc !== undefined ? byId.get(pkg.spineToc) : undefined) ??
           pkg.manifest.find((i) => i.mediaType === NCX_MEDIA_TYPE)
-        if (ncxItem) {
+        if (ncxItem && ncxItem.mediaType === NCX_MEDIA_TYPE) {
           const { ncx, messages: ncxMessages } = parseNcx(ncxItem, container)
           messages.push(...ncxMessages)
           if (ncx) messages.push(...validateNcx(ncx, pkg, container, target))

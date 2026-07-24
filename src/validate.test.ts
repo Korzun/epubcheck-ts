@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { zipSync } from 'fflate'
 import { validateEpub } from './validate.js'
-import { buildEpub2, NCX2, buildEpub, OPF } from '../test/fixtures/build.js'
+import { buildEpub2, NCX2, buildEpub, OPF, OPF2 } from '../test/fixtures/build.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 
@@ -220,6 +220,30 @@ describe('EPUB 2 pipeline', () => {
     })
     const report = await validateEpub(epub)
     expect(report.messages.map((m) => m.id)).toContain('RSC-007')
+  })
+
+  it('does not parse a non-NCX spine-toc target as an NCX (duplicate id → OPF-050, no navMap RSC-005)', async () => {
+    // The content item is given id="ncx", colliding with the real NCX item; the
+    // spine toc="ncx" now resolves to the XHTML content doc. epubcheck reports
+    // OPF-050 (non-NCX toc type) and skips the NCX parse rather than emitting a
+    // spurious "must contain a navMap element" RSC-005.
+    const epub = buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2.replace('id="content" href="content_001.xhtml"', 'id="ncx" href="content_001.xhtml"'),
+      },
+    })
+    const report = await validateEpub(epub)
+    expect(report.messages.map((m) => m.id)).toContain('OPF-050')
+    expect(report.messages.some((m) => m.id === 'RSC-005' && m.message.includes('navMap'))).toBe(false)
+  })
+
+  it('does not parse a single mistyped spine-toc target as an NCX', async () => {
+    const epub = buildEpub2({
+      files: { 'EPUB/package.opf': OPF2.replace('<spine toc="ncx">', '<spine toc="content">') },
+    })
+    const report = await validateEpub(epub)
+    expect(report.messages.map((m) => m.id)).toContain('OPF-050')
+    expect(report.messages.some((m) => m.id === 'RSC-005' && m.message.includes('navMap'))).toBe(false)
   })
 
   it('validates a legacy NCX in an EPUB 3 book', async () => {
