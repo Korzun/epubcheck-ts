@@ -30,7 +30,7 @@ function baseSetup(): { pkg2: PackageDocument; container: EpubContainer } {
     version: '2.0',
     uniqueIdentifier: 'uid',
     metadata: { identifiers: [{ id: 'uid', value: 'urn:uuid:x' }], titles: ['T'], languages: ['en'], modifiedCount: 0 },
-    metas: [],
+    root: { type: 'element', name: 'package', loc: LOC },
     manifest: [ncxItem, contentItem],
     spinePresent: true,
     spine: [{ idref: 'content', linear: true, properties: [], loc: LOC }],

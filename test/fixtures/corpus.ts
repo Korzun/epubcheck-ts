@@ -113,9 +113,13 @@ export const CORPUS: Fixture[] = [
   {
     name: 'opf-unique-identifier-attr-missing',
     area: 'opf',
-    description: 'package has no unique-identifier attribute (epubcheck OPF-048)',
+    description: 'package has no unique-identifier attribute (epubcheck OPF-048 + RSC-005)',
     epub: buildEpub({ files: { 'EPUB/package.opf': OPF.replace(' unique-identifier="uid"', '') } }),
-    expected: [E('OPF-048', 'ERROR')],
+    // The schema layer now also reports the RNG failure the jar emits alongside
+    // OPF-048: element "package" missing required attribute "unique-identifier".
+    // (The jar additionally emits OPF-030 with a "null" identifier here, which our
+    // OPF-030 logic does not — a pre-existing gap unrelated to the schema wiring.)
+    expected: [E('OPF-048', 'ERROR'), E('RSC-005', 'ERROR')],
   },
   {
     name: 'opf-manifest-item-missing-file',

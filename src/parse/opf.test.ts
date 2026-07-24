@@ -49,64 +49,11 @@ describe('parseOpf', () => {
     expect(pkg?.spinePresent).toBe(true)
   })
 
-  it('collects OPF-namespace metas with their attributes in document order', () => {
+  it('retains the parsed root for the schema layer', () => {
     const { pkg } = parseOpf(
-      container(
-        PKG(
-          '<metadata><meta id="i" xml:lang="en" name="calibre:series" content="X" scheme="s"/></metadata>' +
-            '<manifest/><spine/>',
-        ),
-      ),
+      container(PKG(META + '<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest><spine><itemref idref="nav"/></spine>')),
     )
-    expect(pkg?.metas).toHaveLength(1)
-    expect(Object.keys(pkg!.metas[0]!.attrs)).toEqual(['id', 'xml:lang', 'name', 'content', 'scheme'])
-    expect(pkg?.metas[0]?.attrs['name']).toBe('calibre:series')
-    expect(pkg?.metas[0]?.qname).toBe('meta')
-  })
-
-  it('records the qualified name of an explicitly prefixed meta', () => {
-    const { pkg } = parseOpf(
-      container(
-        PKG(
-          '<metadata xmlns:opf="http://www.idpf.org/2007/opf"><opf:meta name="n" content="c"/></metadata>' +
-            '<manifest/><spine/>',
-        ),
-      ),
-    )
-    expect(pkg?.metas[0]?.qname).toBe('opf:meta')
-  })
-
-  it('excludes xmlns declarations from meta attributes', () => {
-    const { pkg } = parseOpf(
-      container(
-        PKG('<metadata><meta xmlns:foo="http://example.org/f" name="n" content="c" foo:bar="b"/></metadata><manifest/><spine/>'),
-      ),
-    )
-    expect(Object.keys(pkg!.metas[0]!.attrs)).toEqual(['name', 'content', 'foo:bar'])
-  })
-
-  it('ignores metas outside the OPF namespace', () => {
-    const { pkg } = parseOpf(
-      container(
-        PKG('<metadata><meta xmlns="http://example.org/x" property="dcterms:modified">2020</meta></metadata><manifest/><spine/>'),
-      ),
-    )
-    expect(pkg?.metas).toEqual([])
-  })
-
-  it('records whether a meta holds non-whitespace text', () => {
-    const { pkg } = parseOpf(
-      container(
-        PKG(
-          '<metadata>' +
-            '<meta name="a" content="c">text</meta>' +
-            '<meta name="b" content="c">   </meta>' +
-            '<meta name="d" content="c"/>' +
-            '</metadata><manifest/><spine/>',
-        ),
-      ),
-    )
-    expect(pkg?.metas.map((m) => m.hasText)).toEqual([true, false, false])
+    expect(pkg?.root.name).toBe('package')
   })
 
   it('reports RSC-001 when the rootfile OPF resource is missing', () => {
@@ -215,7 +162,7 @@ describe('manifestPathMap', () => {
     const pkg = {
       path: 'EPUB/package.opf', version: '3.0' as const, uniqueIdentifier: 'u',
       metadata: { identifiers: [], titles: [], languages: [], modifiedCount: 1 },
-      metas: [],
+      root: { type: 'element' as const, name: 'package', loc },
       manifest: [
         { id: 'a', href: 'x/a.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc },
         { id: 'r', href: 'https://example.com/r.png', mediaType: 'image/png', properties: [], loc },

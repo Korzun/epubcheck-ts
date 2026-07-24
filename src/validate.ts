@@ -2,6 +2,7 @@ import { openEpub } from './io/zip.js'
 import { validateOcf } from './checks/ocf.js'
 import { parseOpf, type ManifestItem } from './parse/opf.js'
 import { validateOpf, checkUndeclaredResources } from './checks/opf.js'
+import { validateSchema } from './checks/schema.js'
 import { parseNav } from './parse/nav.js'
 import { validateNav } from './checks/nav.js'
 import { parseNcx } from './parse/ncx.js'
@@ -54,6 +55,12 @@ export async function validateEpub(
       target = resolved.target
 
       messages.push(...validateOpf(pkg, container, target))
+      // Schema validation requires a resolvable supported major (2.0 or 3.x); an
+      // unsupported or absent version already produces OPF-001 and real
+      // EPUBCheck does not additionally run the grammar against it.
+      if (target !== undefined) {
+        messages.push(...validateSchema(pkg, target))
+      }
       messages.push(...checkUndeclaredResources(pkg, container))
 
       if (options.version && resolved.detectedMajor && majorVersion(options.version) !== resolved.detectedMajor) {

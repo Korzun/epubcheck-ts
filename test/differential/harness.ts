@@ -22,6 +22,21 @@ export interface CaseResult {
   match: boolean
 }
 
+/**
+ * Canonicalise a message for comparison. Whitespace is collapsed, and the RSC-005
+ * `Error while parsing file '<path>': ` prefix is reduced to `Error while parsing
+ * file: ` — the jar's JSON `message` keeps the filename in `locations`, not the
+ * message text, whereas epubcheck-ts bakes it into the RSC-005 template. Stripping
+ * the path from both sides (a no-op on the jar) compares the semantic message rather
+ * than the filename-embedding convention.
+ */
+function normalizeMessage(message: string): string {
+  return message
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/Error while parsing file '[^']*': /, 'Error while parsing file: ')
+}
+
 /** One raw message as it appears in EPUBCheck's JSON report (before location expansion). */
 export interface JarMessage {
   ID: string
@@ -84,7 +99,7 @@ export function expandJarMessages(messages: JarMessage[]): Emitted[] {
     const record: Emitted = {
       id: m.ID,
       severity: m.severity,
-      message: m.message.replace(/\s+/g, ' ').trim(),
+      message: normalizeMessage(m.message),
     }
     const count = Array.isArray(m.locations) ? m.locations.length : 0
     if (count <= 1) out.push(record)
@@ -104,7 +119,7 @@ export async function runTs(epub: Uint8Array): Promise<Emitted[]> {
   return report.messages.map((m) => ({
     id: m.id,
     severity: m.severity,
-    message: m.message.replace(/\s+/g, ' ').trim(),
+    message: normalizeMessage(m.message),
   }))
 }
 
@@ -124,9 +139,6 @@ export const KNOWN_UNIMPLEMENTED = new Set<string>([
   // the reserved vocabulary or a package `prefix` attribute. Prefix-declaration semantics we
   // do not model.
   'OPF-028',
-  // "Duplicate reference elements with the same type and href" — a guide-level dedup WARNING
-  // beyond the reference checks we implement.
-  'RSC-017',
 ])
 
 /** Compare id, severity and wording as an order-insensitive multiset. */
