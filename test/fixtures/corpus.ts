@@ -766,9 +766,9 @@ export const CORPUS: Fixture[] = [
   {
     name: 'opf2-toc-not-ncx',
     area: 'opf',
-    description: 'spine toc idref resolves to a non-NCX item (epubcheck OPF-050); the XHTML then fails NCX structure (RSC-005)',
+    description: 'spine toc idref resolves to a non-NCX item (epubcheck OPF-050); the non-NCX target is not parsed as an NCX (jar emits CHK-008 + OPF-050, no navMap RSC-005)',
     epub: buildEpub2({ files: { 'EPUB/package.opf': OPF2.replace('<spine toc="ncx">', '<spine toc="content">') } }),
-    expected: [E('OPF-050', 'ERROR'), E('RSC-005', 'ERROR')],
+    expected: [E('OPF-050', 'ERROR')],
   },
   {
     name: 'opf2-meta-property',
