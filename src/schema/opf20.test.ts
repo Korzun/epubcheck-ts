@@ -148,4 +148,50 @@ describe('OPF 2.0 grammar', () => {
       'attribute "file-as" not allowed here; expected attribute "id", "opf:file-as", "opf:role" or "xml:lang"',
     ])
   })
+
+  // The OEB 1.2 branch: dc-metadata (+ optional x-metadata), previously entirely untested.
+  it('accepts a valid dc-metadata wrapper', () => {
+    expect(run(PKG(`<dc-metadata>${BASE}</dc-metadata>`))).toEqual([])
+  })
+
+  it('accepts dc-metadata plus x-metadata', () => {
+    expect(
+      run(
+        PKG(
+          `<dc-metadata>${BASE}</dc-metadata><x-metadata><meta name="cover" content="cover.jpg"/></x-metadata>`,
+        ),
+      ),
+    ).toEqual([])
+  })
+
+  it('rejects mixing the OEB 1.2 branch with an EPUB 2 branch element', () => {
+    expect(
+      run(
+        PKG(`<dc-metadata>${BASE}</dc-metadata><meta name="cover" content="cover.jpg"/>`),
+      ),
+    ).toEqual([
+      'element "meta" not allowed here; expected the element end-tag or element "x-metadata"',
+    ])
+  })
+
+  it('rejects x-metadata without a preceding dc-metadata wrapper', () => {
+    expect(
+      run(
+        PKG(`${BASE}<x-metadata><meta name="cover" content="cover.jpg"/></x-metadata>`),
+      ),
+    ).toEqual([
+      'element "x-metadata" not allowed here; expected the element end-tag, element "dc:contributor", "dc:coverage", "dc:creator", "dc:date", "dc:description", "dc:format", "dc:identifier", "dc:language", "dc:publisher", "dc:relation", "dc:rights", "dc:source", "dc:subject", "dc:title", "dc:type" or "meta" or an element from another namespace',
+    ])
+  })
+
+  // Minor finding: required-modules is legal on item only alongside required-namespace.
+  it('requires required-namespace when an item carries required-modules', () => {
+    const xml = PKG(BASE).replace(
+      'media-type="application/x-dtbncx+xml"',
+      'media-type="application/x-dtbncx+xml" required-modules="foo"',
+    )
+    expect(run(xml)).toEqual([
+      'element "item" missing required attribute "required-namespace"',
+    ])
+  })
 })
