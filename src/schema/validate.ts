@@ -12,7 +12,8 @@ import {
 } from './expected.js'
 import {
   elementNotAllowedYet, incompleteExpected, incompleteMissingElement, invalidAttributeValue,
-  missingAttributes, noAttributesAllowed, textNotAllowed, unknownAttribute, unknownElement,
+  invalidCharacterContent, missingAttributes, noAttributesAllowed, textNotAllowed, unknownAttribute,
+  unknownElement,
 } from './messages.js'
 
 export interface Grammar {
@@ -341,6 +342,15 @@ export function validateAgainst(grammar: Grammar, root: XmlNode, path: string): 
       // Every outstanding requirement, not just the first: the jar lists them all,
       // alphabetically and joined with `and`.
       emit(node, incompleteMissingElement(qnameOf(node), required))
+      return
+    }
+    // No text was fed to `textDeriv` at all (the element was empty, or its only text
+    // was whitespace that `parseXml` already discarded), yet a `data` datatype is
+    // still outstanding: the element's string-value is the empty string, and the jar
+    // reports that against the datatype rather than the generic "incomplete" shape —
+    // the same way a bad attribute VALUE gets its own message via `datatypeFor`.
+    if (inner.k === 'data') {
+      emit(node, invalidCharacterContent(qnameOf(node), inner.type.describe('')))
       return
     }
     emit(node, incompleteExpected(qnameOf(node), expectedElements(inner), nullable(inner)))
