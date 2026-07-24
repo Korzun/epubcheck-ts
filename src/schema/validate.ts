@@ -145,14 +145,30 @@ function closeStartTag(afterAttrs: Pattern): Pattern {
 
 /**
  * Advance past outstanding required elements until `ns`/`local` would be accepted,
- * WITHOUT consuming it; `undefined` when no amount of skipping helps.
+ * AND consume it, returning the continuation that follows; `undefined` when no
+ * amount of skipping helps.
  *
  * This is the recovery for `element "c" not allowed yet; missing required element
- * "b"`: having reported the missing `b`, the walk carries on from the position `c`
- * was aiming at, so the real `<b/>` arriving later is itself reported as
- * out-of-place instead of silently re-satisfying a requirement we already
- * complained about. Element patterns are never descended into, so a `ref`-based
- * recursive grammar cannot loop here.
+ * "b"`: having reported the missing `b`, the walk forgives that requirement, takes
+ * `c` at the position it was aiming at, and carries on AFTER it — so the real `<b/>`
+ * arriving later is itself reported as out-of-place instead of silently
+ * re-satisfying a requirement we already complained about, and `c` is not expected
+ * a second time. Element patterns are never descended into (`forceEnd` closes the
+ * offender without walking its children, matching `childDeriv`'s rule that a
+ * rejected element's contents are not measured), so a `ref`-based recursive grammar
+ * cannot loop here.
+ *
+ * This was originally inferred from a synthetic grammar. It is now confirmed
+ * against three real EPUBCheck 5.3.0 jar probes, each of which needs the offender
+ * consumed for its second message to carry the expected list the jar prints:
+ *   - EPUB 3, `<spine>` before `<manifest>` with the real spine still following:
+ *     the premature spine leaves `guide?, bindings?, collection*`, so both the
+ *     manifest and the second spine report `expected the element end-tag or
+ *     element "bindings", "collection" or "guide"`.
+ *   - EPUB 2, `<guide>` before `<spine>`: consuming the guide leaves EMPTY, so the
+ *     spine reports `expected the element end-tag`.
+ *   - EPUB 2, `<tours>` before `<spine>`: consuming the tours leaves `guide?`, so
+ *     the spine reports `expected the element end-tag or element "guide"`.
  */
 function skipRequired(p: Pattern, ns: string | undefined, local: string): Pattern | undefined {
   const accepts = (q: Pattern): boolean => startTagOpenDeriv(q, ns, local).k !== 'notAllowed'
@@ -186,7 +202,10 @@ function skipRequired(p: Pattern, ns: string | undefined, local: string): Patter
         return undefined
     }
   }
-  return walk(p)
+  const reached = walk(p)
+  // `reached` accepts the offender by construction, so opening it cannot be
+  // `notAllowed` and `forceEnd` always finds the continuation.
+  return reached && forceEnd(startTagOpenDeriv(reached, ns, local))
 }
 
 /**

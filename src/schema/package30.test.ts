@@ -196,17 +196,12 @@ describe('package-30 grammar', () => {
     ])
   })
 
-  // KNOWN MISMATCH — see .superpowers/sdd/task-9-report.md. Ground truth probed against
-  // the real EPUBCheck 5.3.0 jar for this exact document is the three messages below, in
-  // this order. Our `skipRequired` recovery (src/schema/validate.ts) instead produces only
-  // two messages, in a different order:
-  //   element "spine" not allowed yet; missing required element "manifest"
-  //   element "manifest" not allowed here; expected element "spine"
-  // Per instructions this was NOT "fixed" by touching validate.ts or adjusting the
-  // expected strings below to match the actual (wrong) output; it is left `.skip`ped and
-  // reported verbatim instead, since it is the first real-jar disconfirmation of an
-  // inferred recovery.
-  it.skip('rejects spine placed before manifest, with three ordered messages including the skipRequired recovery', () => {
+  // Ground truth probed against the real EPUBCheck 5.3.0 jar for this exact document.
+  // The jar's JSON sorts messages alphabetically; these are its three messages
+  // re-sorted into document order, which is the order we emit in. Consuming the
+  // premature `<spine>` leaves `guide?, bindings?, collection*`, which is why the
+  // manifest and the second spine both carry that expected list — see `skipRequired`.
+  it('rejects spine placed before manifest, with three ordered messages including the skipRequired recovery', () => {
     const xml =
       `<package xmlns="${OPF_NS}" xmlns:dc="${DC_NS}" version="3.0" unique-identifier="uid">` +
       `<metadata>${BASE}</metadata>` +
@@ -215,9 +210,9 @@ describe('package-30 grammar', () => {
       `<spine><itemref idref="nav"/></spine>` +
       `</package>`
     expect(run(xml)).toEqual([
+      'element "spine" not allowed yet; missing required element "manifest"',
       'element "manifest" not allowed here; expected the element end-tag or element "bindings", "collection" or "guide"',
       'element "spine" not allowed here; expected the element end-tag or element "bindings", "collection" or "guide"',
-      'element "spine" not allowed yet; missing required element "manifest"',
     ])
   })
 })

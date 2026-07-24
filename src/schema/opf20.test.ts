@@ -97,6 +97,36 @@ describe('OPF 2.0 grammar', () => {
     ])
   })
 
+  // Jar ground truth (EPUBCheck 5.3.0). The `not allowed yet` recovery consumes the
+  // offender as well as forgiving the missing predecessor, so what follows is measured
+  // against the position AFTER the misplaced element: past `guide` nothing remains,
+  // hence the bare end-tag expectation on the spine. See `skipRequired`.
+  it('recovers from a guide placed before the spine, leaving nothing expected after it', () => {
+    const xml = PKG(BASE).replace(
+      '<spine toc="ncx"><itemref idref="ncx"/></spine>',
+      '<guide><reference type="text" href="a.xhtml"/></guide>' +
+        '<spine toc="ncx"><itemref idref="ncx"/></spine>',
+    )
+    expect(run(xml)).toEqual([
+      'element "guide" not allowed yet; missing required element "spine"',
+      'element "spine" not allowed here; expected the element end-tag',
+    ])
+  })
+
+  // The same recovery one position earlier: past `tours` the optional `guide` is still
+  // to come, so the jar names it.
+  it('recovers from a tours placed before the spine, leaving the optional guide expected', () => {
+    const xml = PKG(BASE).replace(
+      '<spine toc="ncx"><itemref idref="ncx"/></spine>',
+      '<tours><tour id="t1" title="Tour 1"><site title="S" href="a.xhtml"/></tour></tours>' +
+        '<spine toc="ncx"><itemref idref="ncx"/></spine>',
+    )
+    expect(run(xml)).toEqual([
+      'element "tours" not allowed yet; missing required element "spine"',
+      'element "spine" not allowed here; expected the element end-tag or element "guide"',
+    ])
+  })
+
   // Beyond the brief: the recursive any-other-element production.
   it('accepts a foreign-namespace element nested inside another, inside metadata', () => {
     expect(

@@ -103,10 +103,14 @@ describe('ordering', () => {
     return validateAgainst(ORDERED, root, 'p.opf').map((m) => m.message)
   }
 
-  it('reports a premature element as "not allowed yet"', () => {
+  // The recovery forgives the missing `b` AND consumes the premature `c`, so the walk
+  // resumes past `c` with nothing left to expect. This synthetic case is the exact
+  // shape of the jar's EPUB 2 `<guide>`-before-`<spine>` probe (see opf20.test.ts),
+  // which likewise reports the bare end-tag expectation on the later element.
+  it('reports a premature element as "not allowed yet" and continues after it', () => {
     expect(runOrdered(`<pkg xmlns="${NS}"><a/><c/><b/></pkg>`)).toEqual([
       detail('element "c" not allowed yet; missing required element "b"'),
-      detail('element "b" not allowed here; expected the element end-tag or element "c"'),
+      detail('element "b" not allowed here; expected the element end-tag'),
     ])
   })
 
