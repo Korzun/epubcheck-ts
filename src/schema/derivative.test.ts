@@ -54,12 +54,17 @@ describe('attDeriv and startTagCloseDeriv', () => {
     const open = startTagOpenDeriv(withId, undefined, 'e')
     expect(attDeriv(open, { qname: 'id', local: 'id', value: '1' }).k).toBe('notAllowed')
   })
+  // Verified by mutation: this assertion alone does NOT pin startTagCloseDeriv --
+  // making its `attribute` case a no-op leaves the whole suite green, because
+  // `nullable` is false for both `attribute` and `notAllowed`. It is kept as the
+  // negative half of the pair below, which together show the value can move.
+  // startTagCloseDeriv's attribute case is pinned by the driver tests instead,
+  // where a surviving attribute alternative changes what element content is accepted.
   it('leaves a required-but-absent attribute non-nullable at close', () => {
     const open = startTagOpenDeriv(withId, undefined, 'e')
-    // nullable() is unconditionally false for an `after`-shaped pattern, so the
-    // check only discriminates once endTagDeriv has resolved the content model.
     expect(nullable(endTagDeriv(startTagCloseDeriv(open)))).toBe(false)
   })
+  // This half IS discriminating: breaking attDeriv's `attribute` case fails it.
   it('is nullable at close once the required attribute has been supplied', () => {
     const open = startTagOpenDeriv(withId, undefined, 'e')
     const supplied = attDeriv(open, { qname: 'id', local: 'id', value: 'ok' })
