@@ -28,12 +28,19 @@ export function quoteAll(names: readonly string[]): string[] {
  * That is why `the element end-tag or element "guide" or "tours"` has two `or`s
  * while the long metadata list uses a comma after the end-tag.
  */
-export function expectedClause(names: readonly string[], endTagAllowed: boolean): string {
+export function expectedClause(
+  names: readonly string[],
+  endTagAllowed: boolean,
+  textAllowed = false,
+): string {
   const parts: string[] = []
   if (endTagAllowed) parts.push('the element end-tag')
   const elements = names.filter((n) => n !== WILDCARD)
   if (elements.length > 0) parts.push(`element ${joinOr(quoteAll(elements))}`)
   if (names.includes(WILDCARD)) parts.push(WILDCARD)
+  // Text is the last alternative, after the foreign-namespace wildcard: a pure
+  // text content model yields `the element end-tag or text`.
+  if (textAllowed) parts.push('text')
   return joinOr(parts)
 }
 
@@ -72,8 +79,9 @@ export function unknownElement(
   scope: 'anywhere' | 'here',
   expected: readonly string[],
   endTagAllowed: boolean,
+  textAllowed = false,
 ): string {
-  return `element "${qname}" not allowed ${scope}; expected ${expectedClause(expected, endTagAllowed)}`
+  return `element "${qname}" not allowed ${scope}; expected ${expectedClause(expected, endTagAllowed, textAllowed)}`
 }
 
 export function elementNotAllowedYet(qname: string, missingRequired: string): string {
@@ -95,6 +103,7 @@ export function incompleteExpected(
   parent: string,
   expected: readonly string[],
   endTagAllowed: boolean,
+  textAllowed = false,
 ): string {
-  return `element "${parent}" incomplete; expected ${expectedClause(expected, endTagAllowed)}`
+  return `element "${parent}" incomplete; expected ${expectedClause(expected, endTagAllowed, textAllowed)}`
 }

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { parseXml } from '../io/xml.js'
 import {
-  EMPTY, element, attribute, name, data, all, choice, oneOrMore, optional, seq, group,
+  EMPTY, TEXT, element, attribute, name, anyNameExcept, data, all, choice, oneOrMore,
+  optional, seq, group,
 } from './pattern.js'
 import { DT_TEXT, DT_ID, DT_IDREF } from './datatypes.js'
 import { makeGrammar, validateAgainst } from './validate.js'
@@ -250,6 +251,76 @@ describe('incomplete parent', () => {
     expect(validateAgainst(CHOICE, root, 'p.opf').map((m) => m.message)).toEqual([
       detail('element "e" incomplete; expected element "a" or "b"'),
       detail('element "z" missing required attribute "k"'),
+    ])
+  })
+})
+
+// D1: a text content model that rejects a child element offers `or text`, because
+// character data is still acceptable at that position — mirrors the jar's
+// `<dc:title>Title<b/></dc:title>` -> `expected the element end-tag or text`.
+describe('text content model offers "or text"', () => {
+  const TITLE = makeGrammar(
+    element(EN('doc'), oneOrMore(element(EN('title'), TEXT))),
+  )
+  const runTitle = (xml: string) => {
+    const root = parseXml(new TextEncoder().encode(xml), 'p.opf').root!
+    return validateAgainst(TITLE, root, 'p.opf').map((m) => m.message)
+  }
+
+  it('appends "or text" when a child element intrudes on a text model', () => {
+    expect(runTitle(`<doc xmlns="${NS}"><title>Text<b/></title></doc>`)).toEqual([
+      detail('element "b" not allowed anywhere; expected the element end-tag or text'),
+    ])
+  })
+
+  // Guard: an empty (element-only, no text) model must NOT gain "or text".
+  it('does not append "or text" for a non-text model', () => {
+    expect(run(`<root xmlns="${NS}"><child a="1"><root/></child></root>`)).toEqual([
+      detail('element "root" not allowed here; expected the element end-tag'),
+    ])
+  })
+})
+
+// D2: the here/anywhere split is wildcard-aware. A foreign-namespace element is
+// `here` when a grammar `anyNameExcept` wildcard would accept it somewhere, even
+// though it is not a named grammar element.
+describe('here/anywhere is wildcard-aware', () => {
+  const OPF_NS = 'http://opf'
+  // <pkg><meta/>+ </pkg>, where <meta> may contain any foreign-namespace element.
+  // The wildcard lives INSIDE meta, so at the top level a stray foreign element is
+  // rejected outright (no premature-recovery skips to it) yet still matches the
+  // grammar somewhere -> the here/anywhere split, not the "not allowed yet" path.
+  const WILD = makeGrammar(
+    element(
+      name(OPF_NS, 'pkg', 'pkg'),
+      oneOrMore(
+        element(
+          name(OPF_NS, 'meta', 'meta'),
+          optional(element(anyNameExcept([OPF_NS]), EMPTY)),
+        ),
+      ),
+    ),
+  )
+  const runWild = (xml: string) => {
+    const root = parseXml(new TextEncoder().encode(xml), 'p.opf').root!
+    return validateAgainst(WILD, root, 'p.opf').map((m) => m.message)
+  }
+
+  it('classifies a foreign-namespace element the wildcard accepts as "here"', () => {
+    // After a valid <meta>, <x:foo> is rejected at the top level, but the wildcard
+    // inside <meta> accepts it somewhere -> "here", not "anywhere".
+    expect(
+      runWild(`<pkg xmlns="${OPF_NS}"><meta/><x:foo xmlns:x="http://example.com/x"/></pkg>`),
+    ).toEqual([
+      detail('element "x:foo" not allowed here; expected the element end-tag or element "meta"'),
+    ])
+  })
+
+  it('keeps an unprefixed element in the excepted namespace as "anywhere"', () => {
+    // <zzz> inherits the OPF namespace, which the wildcard excepts, and there is no
+    // named `zzz` element -> nothing in the grammar could ever accept it -> "anywhere".
+    expect(runWild(`<pkg xmlns="${OPF_NS}"><meta/><zzz/></pkg>`)).toEqual([
+      detail('element "zzz" not allowed anywhere; expected the element end-tag or element "meta"'),
     ])
   })
 })

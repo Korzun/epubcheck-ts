@@ -1,4 +1,7 @@
-import { ANY_OTHER_NAMESPACE_DISPLAY, deref, displayOf, nullable, type Pattern } from './pattern.js'
+import {
+  ANY_OTHER_NAMESPACE_DISPLAY, deref, displayOf, nameMatches, nullable,
+  type NameClass, type Pattern,
+} from './pattern.js'
 
 const WILDCARD = ANY_OTHER_NAMESPACE_DISPLAY
 
@@ -41,6 +44,34 @@ function collectElements(p: Pattern, out: Set<string>): void {
       collectElements(d.p1, out)
       return
     default:
+  }
+}
+
+/**
+ * Whether the pattern's current content position can consume a text node — i.e. a
+ * reachable `text` or `data` pattern. Mirrors `collectElements`' traversal: an
+ * `element` there is a boundary (the next thing accepted is that element, not
+ * text), so element nodes contribute nothing. Drives the `or text` alternative
+ * EPUBCheck appends for a text content model, e.g. `dc:title`'s
+ * `expected the element end-tag or text`.
+ */
+export function acceptsText(p: Pattern): boolean {
+  const d = deref(p)
+  switch (d.k) {
+    case 'text':
+    case 'data':
+      return true
+    case 'choice':
+    case 'interleave':
+      return acceptsText(d.p1) || acceptsText(d.p2)
+    case 'group':
+      return acceptsText(d.p1) || (nullable(d.p1) && acceptsText(d.p2))
+    case 'oneOrMore':
+      return acceptsText(d.p)
+    case 'after':
+      return acceptsText(d.p1)
+    default:
+      return false
   }
 }
 
@@ -129,9 +160,17 @@ function collectRequired(p: Pattern, out: Set<string>, want: 'element' | 'attrib
 }
 
 /**
- * Every element name that appears anywhere in the grammar. Drives the
- * `not allowed anywhere` vs `not allowed here` split: a name absent from this
- * set is "anywhere", a name present but not currently accepted is "here".
+ * Max `ref` expansions before `walkGrammarElements` gives up and throws. Real
+ * grammars expand a `ref` a few dozen times at most, so this can only trip on a
+ * `ref` thunk that keeps producing fresh patterns (unbounded genuine recursion).
+ */
+const REF_EXPANSION_LIMIT = 10000
+
+/**
+ * Visit every element name-class reachable in the grammar, short-circuiting the
+ * moment `visit` returns true. Drives `grammarAcceptsElementName` — the
+ * `not allowed anywhere` vs `not allowed here` split — and is written once so
+ * the termination guards are reasoned about once.
  *
  * Two termination guards, for two different ways a grammar can be recursive:
  *  - `seen` guards by pattern OBJECT IDENTITY. This catches a memoized `ref` cell
@@ -148,7 +187,7 @@ function collectRequired(p: Pattern, out: Set<string>, want: 'element' | 'attrib
  * Both guards are defeated by wrapping the recursive call in a fresh arrow, e.g.
  * `ref(() => collectionPattern())`: that allocates a new `Pattern` AND a new
  * closure on every expansion, so neither `seen` nor `seenThunks` ever re-hits.
- * `REF_EXPANSION_LIMIT` below is a backstop for exactly that case: it turns an
+ * `REF_EXPANSION_LIMIT` above is a backstop for exactly that case: it turns an
  * eventual stack overflow (which gives no hint what to fix) into an immediate,
  * actionable error.
  *
@@ -161,15 +200,7 @@ function collectRequired(p: Pattern, out: Set<string>, want: 'element' | 'attrib
  * native call depth flat regardless of how many expansions occur, so the
  * counter above is what actually fires.
  */
-/**
- * Max `ref` expansions before `grammarNames` gives up and throws. Real grammars
- * expand a `ref` a few dozen times at most, so this can only trip on a `ref`
- * thunk that keeps producing fresh patterns (unbounded genuine recursion).
- */
-const REF_EXPANSION_LIMIT = 10000
-
-export function grammarNames(root: Pattern): Set<string> {
-  const out = new Set<string>()
+function walkGrammarElements(root: Pattern, visit: (nc: NameClass) => boolean): void {
   const seen = new Set<Pattern>()
   const seenThunks = new Set<() => Pattern>()
   let refExpansions = 0
@@ -184,7 +215,7 @@ export function grammarNames(root: Pattern): Set<string> {
       refExpansions++
       if (refExpansions > REF_EXPANSION_LIMIT) {
         throw new Error(
-          'grammarNames: a ref thunk keeps producing fresh patterns, so no cycle guard ' +
+          'walkGrammarElements: a ref thunk keeps producing fresh patterns, so no cycle guard ' +
             'can fire (object identity and resolve-function identity are both defeated by ' +
             'a new object graph on every call). This usually means a recursive production ' +
             'was written as `ref(() => builder())`, wrapping the recursive call in a fresh ' +
@@ -197,7 +228,7 @@ export function grammarNames(root: Pattern): Set<string> {
     const d = deref(p)
     switch (d.k) {
       case 'element':
-        out.add(displayOf(d.name))
+        if (visit(d.name)) return
         stack.push(d.p)
         break
       case 'attribute':
@@ -215,5 +246,22 @@ export function grammarNames(root: Pattern): Set<string> {
       default:
     }
   }
-  return out
+}
+
+/**
+ * Whether SOME element name-class in the grammar — INCLUDING a foreign-namespace
+ * wildcard — matches this `(ns, local)`. Drives the `here`/`anywhere` split: a
+ * name is `here` (present in the grammar, just not valid at this position) when
+ * this returns true, and `anywhere` only when nothing in the grammar could ever
+ * match it. A foreign-namespace element at package level is `here`, because the
+ * `anyNameExcept` wildcard inside `metadata` accepts it somewhere.
+ */
+export function grammarAcceptsElementName(
+  root: Pattern,
+  ns: string | undefined,
+  local: string,
+): boolean {
+  let found = false
+  walkGrammarElements(root, (nc) => (found = nameMatches(nc, ns, local)))
+  return found
 }

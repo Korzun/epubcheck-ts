@@ -8,7 +8,8 @@ import {
   attDeriv, endTagDeriv, startTagCloseDeriv, startTagOpenDeriv, textDeriv,
 } from './derivative.js'
 import {
-  expectedAttributes, expectedElements, grammarNames, requiredAttributes, requiredElements,
+  acceptsText, expectedAttributes, expectedElements, grammarAcceptsElementName,
+  requiredAttributes, requiredElements,
 } from './expected.js'
 import {
   elementNotAllowedYet, incompleteExpected, incompleteMissingElement, invalidAttributeValue,
@@ -18,12 +19,10 @@ import {
 
 export interface Grammar {
   root: Pattern
-  /** Every element display name in the grammar; drives the anywhere/here split. */
-  names: Set<string>
 }
 
 export function makeGrammar(root: Pattern): Grammar {
-  return { root, names: grammarNames(root) }
+  return { root }
 }
 
 /**
@@ -278,8 +277,16 @@ export function validateAgainst(grammar: Grammar, root: XmlNode, path: string): 
       emit(node, elementNotAllowedYet(qname, required[0]!))
       return skipped
     }
-    const scope = grammar.names.has(qname) ? 'here' : 'anywhere'
-    emit(node, unknownElement(qname, scope, expected, nullable(innerOf(p))))
+    // `here` when SOME element name-class in the grammar — including a
+    // foreign-namespace wildcard — could match this element's (ns, local);
+    // `anywhere` only when nothing in the grammar could ever accept it. A literal
+    // display-name lookup would miss the wildcard and misreport `<x:foo>` as
+    // `anywhere`, when the metadata wildcard makes it legal somewhere.
+    const scope = grammarAcceptsElementName(grammar.root, node.ns, node.name ?? '')
+      ? 'here'
+      : 'anywhere'
+    const inner = innerOf(p)
+    emit(node, unknownElement(qname, scope, expected, nullable(inner), acceptsText(inner)))
     // Leave the pattern unchanged, so the next sibling is measured against the
     // same position and reports the same expected list.
     return p

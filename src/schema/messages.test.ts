@@ -56,6 +56,20 @@ describe('expectedClause', () => {
   it('is empty when neither end-tag, names, nor wildcard are present', () => {
     expect(expectedClause([], false)).toBe('')
   })
+  it('appends text as the final alternative for a text content model', () => {
+    // Jar: a pure text model (e.g. dc:title) offers `the element end-tag or text`.
+    expect(expectedClause([], true, true)).toBe('the element end-tag or text')
+  })
+  it('orders text after the end-tag, elements, and the wildcard', () => {
+    expect(
+      expectedClause(['dc:title', 'an element from another namespace'], true, true),
+    ).toBe(
+      'the element end-tag, element "dc:title", an element from another namespace or text',
+    )
+  })
+  it('defaults textAllowed to false, leaving two-arg callers unchanged', () => {
+    expect(expectedClause(['itemref'], true)).toBe('the element end-tag or element "itemref"')
+  })
 })
 
 describe('attribute details', () => {

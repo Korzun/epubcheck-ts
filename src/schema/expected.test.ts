@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
-  EMPTY, element, attribute, name, anyNameExcept, group, optional, all,
-  oneOrMore, data, seq, ref, choice,
+  EMPTY, TEXT, element, attribute, name, anyNameExcept, group, optional, all,
+  oneOrMore, data, seq, ref, choice, interleave,
 } from './pattern.js'
 import { startTagOpenDeriv, startTagCloseDeriv, attDeriv } from './derivative.js'
 import {
-  expectedElements, expectedAttributes, requiredElements, requiredAttributes, grammarNames,
+  acceptsText, expectedElements, expectedAttributes, requiredElements, requiredAttributes,
+  grammarAcceptsElementName,
 } from './expected.js'
 import { DT_TEXT } from './datatypes.js'
 
@@ -100,12 +101,67 @@ describe('requiredElements and requiredAttributes', () => {
   })
 })
 
-describe('grammarNames', () => {
-  it('collects every element name reachable in the grammar', () => {
-    const g = element(N('package'), group(el('metadata'), el('manifest')))
-    expect(grammarNames(g)).toEqual(new Set(['package', 'metadata', 'manifest']))
+describe('acceptsText', () => {
+  it('is true for a bare text content model', () => {
+    expect(acceptsText(TEXT)).toBe(true)
   })
-  it('terminates on a recursive grammar and collects the name once', () => {
+  it('is true for a data content model', () => {
+    expect(acceptsText(data(DT_TEXT))).toBe(true)
+  })
+  it('is false for a pure element content model', () => {
+    expect(acceptsText(el('child'))).toBe(false)
+  })
+  it('is false for an empty content model', () => {
+    expect(acceptsText(EMPTY)).toBe(false)
+  })
+  it('sees text reachable through a choice or interleave', () => {
+    expect(acceptsText(choice(el('a'), TEXT))).toBe(true)
+    expect(acceptsText(interleave(el('a'), TEXT))).toBe(true)
+  })
+  it('sees text only past a nullable head of a group', () => {
+    // text sits in p2; it is reachable only when p1 can be skipped.
+    expect(acceptsText(group(optional(el('a')), TEXT))).toBe(true)
+    // a required element head blocks the text position: the next thing accepted is
+    // the element, not text.
+    expect(acceptsText(group(el('a'), TEXT))).toBe(false)
+  })
+  it('sees text in the head of a group even when the tail is elements', () => {
+    expect(acceptsText(group(TEXT, el('a')))).toBe(true)
+  })
+  it('sees text under oneOrMore and through an after front half', () => {
+    expect(acceptsText(oneOrMore(TEXT))).toBe(true)
+    // The exact mid-element shape the driver queries: <dc:title> after its start
+    // tag, still offering text as its content.
+    const title = element(N('title'), TEXT)
+    const mid = startTagCloseDeriv(startTagOpenDeriv(title, undefined, 'title'))
+    expect(acceptsText(mid)).toBe(true)
+  })
+})
+
+describe('grammarAcceptsElementName', () => {
+  it('matches a named element anywhere in the grammar', () => {
+    const g = element(N('package'), group(el('metadata'), el('manifest')))
+    expect(grammarAcceptsElementName(g, undefined, 'manifest')).toBe(true)
+  })
+  it('is false for a name that appears nowhere in the grammar', () => {
+    const g = element(N('package'), group(el('metadata'), el('manifest')))
+    expect(grammarAcceptsElementName(g, undefined, 'zzz')).toBe(false)
+  })
+  it('matches via a foreign-namespace wildcard', () => {
+    // The `anyNameExcept` accepts any namespace except the excepted ones, so a
+    // foreign-namespace element matches SOMEWHERE even though it is not a named
+    // grammar element — this is what makes `<x:foo>` `here`, not `anywhere`.
+    const g = element(N('package'), element(anyNameExcept(['http://opf']), EMPTY))
+    expect(grammarAcceptsElementName(g, 'http://example.com/x', 'foo')).toBe(true)
+  })
+  it('is false for a namespace excepted from the wildcard', () => {
+    // An unprefixed OPF element or a DC element falls in an excepted namespace, so
+    // the wildcard does NOT match it: absent a named grammar element it is `anywhere`.
+    const g = element(N('package'), element(anyNameExcept(['http://opf', 'http://dc']), EMPTY))
+    expect(grammarAcceptsElementName(g, 'http://opf', 'zzz')).toBe(false)
+    expect(grammarAcceptsElementName(g, 'http://dc', 'isbn')).toBe(false)
+  })
+  it('terminates on a recursive grammar (memoized ref cell)', () => {
     // A ref whose thunk returns an element containing that same ref, e.g. the shape of
     // package-30's `collection` production. Must not loop forever.
     const collectionRef: { current: import('./pattern.js').Pattern } = { current: EMPTY }
@@ -113,8 +169,8 @@ describe('grammarNames', () => {
       N('collection'),
       optional(ref(() => collectionRef.current)),
     )
-    const names = grammarNames(collectionRef.current)
-    expect(names).toEqual(new Set(['collection']))
+    expect(grammarAcceptsElementName(collectionRef.current, undefined, 'collection')).toBe(true)
+    expect(grammarAcceptsElementName(collectionRef.current, undefined, 'zzz')).toBe(false)
   })
   it('terminates on a self-recursive builder function, not just a memoized ref cell', () => {
     // Unlike the memoized-cell test above, `collectionPattern` builds a FRESH object
@@ -125,8 +181,7 @@ describe('grammarNames', () => {
     function collectionPattern(): import('./pattern.js').Pattern {
       return element(N('collection'), optional(ref(collectionPattern)))
     }
-    const names = grammarNames(collectionPattern())
-    expect(names).toEqual(new Set(['collection']))
+    expect(grammarAcceptsElementName(collectionPattern(), undefined, 'zzz')).toBe(false)
   })
   it('throws an actionable error when a ref thunk wraps the recursive call in a fresh arrow', () => {
     // Neither cycle guard can fire here: `ref(() => collectionPattern())` allocates a
@@ -135,6 +190,7 @@ describe('grammarNames', () => {
     function collectionPattern(): import('./pattern.js').Pattern {
       return element(N('collection'), optional(ref(() => collectionPattern())))
     }
-    expect(() => grammarNames(collectionPattern())).toThrow(/memoi/i)
+    // A name absent from the grammar forces a full walk, so the backstop fires.
+    expect(() => grammarAcceptsElementName(collectionPattern(), undefined, 'zzz')).toThrow(/memoi/i)
   })
 })
