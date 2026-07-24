@@ -23,6 +23,7 @@ function validPkg(overrides: Partial<PackageDocument> = {}): PackageDocument {
     version: '3.0',
     uniqueIdentifier: 'uid',
     metadata: { identifiers: [{ id: 'uid', value: 'urn:isbn:1' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
+    metas: [],
     manifest: [navItem],
     spinePresent: true,
     spine: [spineItem],
@@ -152,6 +153,7 @@ describe('checkUndeclaredResources', () => {
     return {
       path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
       metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
+      metas: [],
       manifest: [{ id: 'nav', href: 'nav.xhtml', mediaType: 'application/xhtml+xml', properties: ['nav'], loc: LOC2 }],
       spinePresent: true, spine: [], guide: [], loc: LOC2,
     }
@@ -191,6 +193,7 @@ describe('EPUB 2 rules', () => {
       version: '2.0',
       uniqueIdentifier: 'uid',
       metadata: { identifiers: [{ id: 'uid', value: 'urn:isbn:1' }], titles: ['T'], languages: ['en'], modifiedCount: 0 },
+      metas: [],
       manifest: [ncxItem, contentItem],
       spinePresent: true,
       spine: [contentRef],
@@ -219,6 +222,7 @@ describe('EPUB 2 rules', () => {
       version: '3.0',
       uniqueIdentifier: 'uid',
       metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 0 },
+      metas: [],
       manifest: [{ id: 'nav', href: 'nav.xhtml', mediaType: 'application/xhtml+xml', properties: ['nav'], loc: LOC }],
       spinePresent: true,
       spine: [{ idref: 'nav', linear: true, properties: [], loc: LOC }],
@@ -308,6 +312,77 @@ describe('EPUB 2 rules', () => {
 
     const wrongTypeTocPkg = validPkg2({ spineToc: 'content' })
     expect(ids(validateOpf(wrongTypeTocPkg, container2, '2.0'))).toContain('OPF-050')
+  })
+
+  // OPF 2.0 <meta> content model (epubcheck schema/20/rng/opf20.rng, OPF20.meta-element).
+  // Wording below is transcribed from EPUBCheck 5.3.0 output, not paraphrased.
+  describe('OPF 2.0 meta content model', () => {
+    const metaPkg = (attrs: Record<string, string>, hasText = false, qname = 'meta'): PackageDocument =>
+      validPkg2({ metas: [{ qname, attrs, hasText, loc: LOC }] })
+    const details = (pkg: PackageDocument, version: EpubVersion = '2.0'): string[] =>
+      validateOpf(pkg, container2, version)
+        .filter((m) => m.id === 'RSC-005')
+        .map((m) => m.message.replace(/^Error while parsing file '[^']*': /, ''))
+
+    it('accepts a valid OPF 2.0 meta', () => {
+      expect(details(metaPkg({ name: 'calibre:series', content: 'X' }))).toEqual([])
+    })
+
+    it('accepts every allowed attribute', () => {
+      const attrs = { id: 'i', 'xml:lang': 'en', name: 'n', content: 'c', scheme: 's' }
+      expect(details(metaPkg(attrs))).toEqual([])
+    })
+
+    it('rejects an EPUB 3 property meta three ways, in EPUBCheck order', () => {
+      const messages = validateOpf(metaPkg({ property: 'dcterms:modified' }, true), container2, '2.0')
+      expect(messages.map((m) => m.id)).toEqual(['RSC-005', 'RSC-005', 'RSC-005'])
+      expect(messages.map((m) => m.severity)).toEqual(['ERROR', 'ERROR', 'ERROR'])
+      expect(messages.map((m) => m.message.replace(/^Error while parsing file '[^']*': /, ''))).toEqual([
+        'attribute "property" not allowed here; expected attribute "content", "id", "name", "scheme" or "xml:lang"',
+        'element "meta" missing required attributes "content" and "name"',
+        'text not allowed here; expected the element end-tag',
+      ])
+    })
+
+    it('uses singular wording for a single missing required attribute', () => {
+      expect(details(metaPkg({ name: 'n' }))).toEqual(['element "meta" missing required attribute "content"'])
+    })
+
+    it('narrows the expected list to allowed attributes not already present', () => {
+      expect(details(metaPkg({ name: 'n', content: 'c', foo: 'bar' }))).toEqual([
+        'attribute "foo" not allowed here; expected attribute "id", "scheme" or "xml:lang"',
+      ])
+    })
+
+    it('reports one error per unknown attribute, in document order', () => {
+      expect(details(metaPkg({ name: 'n', content: 'c', foo: '1', bar: '2' }))).toEqual([
+        'attribute "foo" not allowed here; expected attribute "id", "scheme" or "xml:lang"',
+        'attribute "bar" not allowed here; expected attribute "id", "scheme" or "xml:lang"',
+      ])
+    })
+
+    it('switches wording when no allowed attribute is left to expect', () => {
+      const attrs = { id: 'i', 'xml:lang': 'en', name: 'n', content: 'c', scheme: 's', foo: 'bar' }
+      expect(details(metaPkg(attrs))).toEqual(['found attribute "foo", but no attributes allowed here'])
+    })
+
+    it('flags a prefixed foreign attribute by its qualified name', () => {
+      expect(details(metaPkg({ name: 'n', content: 'c', 'foo:bar': 'b' }))).toEqual([
+        'attribute "foo:bar" not allowed here; expected attribute "id", "scheme" or "xml:lang"',
+      ])
+    })
+
+    it('echoes the qualified element name when the meta is explicitly prefixed', () => {
+      expect(details(metaPkg({}, false, 'opf:meta'))).toEqual([
+        'element "opf:meta" missing required attributes "content" and "name"',
+      ])
+    })
+
+    it('does not leak into a 3.x target', () => {
+      // A 3.x run emits unrelated RSC-005s here (no nav item); only the meta-model ones must be absent.
+      const out = details(metaPkg({ property: 'dcterms:modified' }, true), '3.3')
+      expect(out.filter((d) => /not allowed here|missing required attribute/.test(d))).toEqual([])
+    })
   })
 
   it('emits none of the EPUB 2 rules for a 3.x target', () => {

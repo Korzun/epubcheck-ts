@@ -14,6 +14,22 @@ import {
 
 const XHTML_MEDIA_TYPE = 'application/xhtml+xml'
 
+/**
+ * The OPF 2.0 `<meta>` content model (epubcheck schema/20/rng/opf20.rng,
+ * `OPF20.meta-element`): `name` and `content` required, `id`/`scheme`/`xml:lang`
+ * optional, no foreign-attribute wildcard, and an empty content model. Listed
+ * alphabetically because that is the order the RelaxNG validator reports them in.
+ */
+const OPF2_META_REQUIRED_ATTRS: readonly string[] = ['content', 'name']
+const OPF2_META_ALLOWED_ATTRS: readonly string[] = ['content', 'id', 'name', 'scheme', 'xml:lang']
+
+/** Quote and join names the way the RelaxNG validator does: `"a", "b" or "c"`. */
+function quotedList(names: readonly string[], conjunction: 'and' | 'or'): string {
+  const quoted = names.map((n) => `"${n}"`)
+  if (quoted.length < 2) return quoted.join('')
+  return `${quoted.slice(0, -1).join(', ')} ${conjunction} ${quoted[quoted.length - 1]}`
+}
+
 export function validateOpf(
   pkg: PackageDocument,
   container: EpubContainer,
@@ -182,6 +198,9 @@ function checkEpub2(pkg: PackageDocument, version: EpubVersion | undefined): Mes
   }
   const declared = manifestPathMap(pkg)
 
+  // Metadata: the OPF 2.0 <meta> content model.
+  messages.push(...checkEpub2Metas(pkg))
+
   // Manifest media-type hygiene (epubcheck OPFChecker.checkItem, OPF 2.0 branch).
   for (const item of pkg.manifest) {
     if (item.mediaType === 'text/html') {
@@ -238,5 +257,42 @@ function checkEpub2(pkg: PackageDocument, version: EpubVersion | undefined): Mes
     }
   }
 
+  return messages
+}
+
+/**
+ * Validate each OPF-namespace `<meta>` against the OPF 2.0 content model. epubcheck
+ * gets this from RelaxNG (opf20.rng) rather than a hand-written rule, so every failure
+ * surfaces as RSC-005 with a schema-derived message; the wording below is transcribed
+ * from EPUBCheck 5.3.0 output. The common real-world trigger is an EPUB 3
+ * `<meta property="…">` written into a 2.x package, which fails all three ways at once.
+ */
+function checkEpub2Metas(pkg: PackageDocument): Message[] {
+  const messages: Message[] = []
+  for (const meta of pkg.metas) {
+    const present = Object.keys(meta.attrs)
+    // The validator lists the allowed attributes it has not already seen on this element.
+    const expected = OPF2_META_ALLOWED_ATTRS.filter((name) => !present.includes(name))
+    for (const name of present.filter((n) => !OPF2_META_ALLOWED_ATTRS.includes(n))) {
+      const detail =
+        expected.length === 0
+          ? `found attribute "${name}", but no attributes allowed here`
+          : `attribute "${name}" not allowed here; expected attribute ${quotedList(expected, 'or')}`
+      messages.push(msg('RSC-005', meta.loc, pkg.path, detail))
+    }
+
+    const missing = OPF2_META_REQUIRED_ATTRS.filter((name) => !present.includes(name))
+    if (missing.length > 0) {
+      const plural = missing.length > 1 ? 's' : ''
+      messages.push(
+        msg('RSC-005', meta.loc, pkg.path, `element "${meta.qname}" missing required attribute${plural} ${quotedList(missing, 'and')}`),
+      )
+    }
+
+    // OPF20.meta-content is <empty/>; whitespace-only text is already dropped by parseXml.
+    if (meta.hasText) {
+      messages.push(msg('RSC-005', meta.loc, pkg.path, 'text not allowed here; expected the element end-tag'))
+    }
+  }
   return messages
 }

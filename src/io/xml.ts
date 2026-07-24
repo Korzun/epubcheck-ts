@@ -5,6 +5,8 @@ export interface XmlNode {
   type: 'element' | 'text'
   name?: string
   ns?: string
+  /** Namespace prefix as written, when the element carried one (schema messages echo it). */
+  prefix?: string
   attrs?: Record<string, string>
   children?: XmlNode[]
   text?: string
@@ -31,6 +33,7 @@ export function parseXml(bytes: Uint8Array, path: string): { root?: XmlNode; mes
       type: 'element',
       name: tag.local,
       ns: tag.uri || undefined,
+      prefix: tag.prefix || undefined,
       attrs,
       children: [],
       loc: { path, line: parser.line, column: parser.column },
