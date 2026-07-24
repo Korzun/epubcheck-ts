@@ -750,6 +750,44 @@ export const CORPUS: Fixture[] = [
     expected: [E('OPF-050', 'ERROR'), E('RSC-005', 'ERROR')],
   },
   {
+    name: 'opf2-meta-property',
+    area: 'opf',
+    description:
+      'EPUB 3 style <meta property> in an OPF 2.0 package: unknown attribute, missing name/content, ' +
+      'and text in an empty content model (epubcheck opf20.rng, three RSC-005s)',
+    epub: buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2.replace(
+          '</metadata>',
+          '<meta property="dcterms:modified">2020-01-01T00:00:00Z</meta></metadata>',
+        ),
+      },
+    }),
+    expected: [E('RSC-005', 'ERROR'), E('RSC-005', 'ERROR'), E('RSC-005', 'ERROR')],
+  },
+  {
+    name: 'opf2-meta-valid',
+    area: 'opf',
+    description: 'a well-formed OPF 2.0 meta (name + content) stays valid — the pair to opf2-meta-property',
+    epub: buildEpub2({
+      files: {
+        'EPUB/package.opf': OPF2.replace('</metadata>', '<meta name="calibre:series" content="X"/></metadata>'),
+      },
+    }),
+    expected: [],
+  },
+  {
+    name: 'opf3-meta-opf2-style',
+    area: 'opf',
+    description:
+      'an OPF 2.0 style meta in an EPUB 3 package stays valid; the OPF 2.0 content model must not leak into 3.x ' +
+      '(the EPUB 3 <meta property> case is covered by the "minimal" baseline)',
+    epub: buildEpub({
+      files: { 'EPUB/package.opf': OPF.replace('</metadata>', '<meta name="calibre:series" content="X"/></metadata>') },
+    }),
+    expected: [],
+  },
+  {
     name: 'opf-manifest-self',
     area: 'opf',
     description: 'manifest lists the package document itself (epubcheck OPF-099; version-agnostic, EPUB 3 fixture)',

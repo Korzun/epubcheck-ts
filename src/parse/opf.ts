@@ -4,6 +4,7 @@ import { msg, type Location, type Message } from '../messages/format.js'
 import { resolvePath, isRemote } from '../util/path.js'
 
 const DC_NS = 'http://purl.org/dc/elements/1.1/'
+const OPF_NS = 'http://www.idpf.org/2007/opf'
 
 export interface DcIdentifier {
   id?: string
@@ -14,6 +15,20 @@ export interface Metadata {
   titles: string[]
   languages: string[]
   modifiedCount: number
+}
+/**
+ * An OPF-namespace `<meta>` from `<metadata>`, retained so the OPF 2.0 content
+ * model can be checked. Metas in a foreign namespace are not collected: the
+ * OPF 2.0 schema permits them, so they carry no content model of their own.
+ */
+export interface OpfMeta {
+  /** Element name as written (`meta`, or `opf:meta` when explicitly prefixed). */
+  qname: string
+  /** Attributes in document order, keyed by qualified name; xmlns declarations excluded. */
+  attrs: Record<string, string>
+  /** True when the element holds text (parseXml already discards whitespace-only text). */
+  hasText: boolean
+  loc: Location
 }
 export interface ManifestItem {
   id?: string
@@ -40,6 +55,8 @@ export interface PackageDocument {
   version?: string
   uniqueIdentifier?: string
   metadata: Metadata
+  /** OPF-namespace `<meta>` elements from `<metadata>`, in document order. */
+  metas: OpfMeta[]
   manifest: ManifestItem[]
   spinePresent: boolean
   spine: SpineItem[]
@@ -57,6 +74,15 @@ function firstChild(node: XmlNode, localName: string): XmlNode | undefined {
 }
 function splitProps(value: string | undefined): string[] {
   return value ? value.trim().split(/\s+/).filter(Boolean) : []
+}
+/** Element attributes minus namespace declarations, which are not attributes to a schema. */
+function schemaAttrs(node: XmlNode): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [name, value] of Object.entries(node.attrs ?? {})) {
+    if (name === 'xmlns' || name.startsWith('xmlns:')) continue
+    out[name] = value
+  }
+  return out
 }
 function textOf(node: XmlNode): string {
   return (node.children ?? [])
@@ -89,8 +115,17 @@ export function parseOpf(container: EpubContainer): { pkg?: PackageDocument; mes
   const guideEl = firstChild(root, 'guide')
 
   const metadata: Metadata = { identifiers: [], titles: [], languages: [], modifiedCount: 0 }
+  const metas: OpfMeta[] = []
   if (metadataEl) {
     for (const el of childElements(metadataEl)) {
+      if (el.name === 'meta' && el.ns === OPF_NS) {
+        metas.push({
+          qname: el.prefix ? `${el.prefix}:${el.name}` : el.name,
+          attrs: schemaAttrs(el),
+          hasText: (el.children ?? []).some((c) => c.type === 'text'),
+          loc: el.loc,
+        })
+      }
       if (el.ns === DC_NS && el.name === 'identifier') {
         metadata.identifiers.push({ id: el.attrs?.['id'], value: textOf(el) })
       } else if (el.ns === DC_NS && el.name === 'title') {
@@ -147,6 +182,7 @@ export function parseOpf(container: EpubContainer): { pkg?: PackageDocument; mes
     version: root.attrs?.['version'],
     uniqueIdentifier: root.attrs?.['unique-identifier'],
     metadata,
+    metas,
     manifest,
     spinePresent: spineEl !== undefined,
     spine,

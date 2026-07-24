@@ -22,6 +22,7 @@ function navDoc(body: string, targets: string[] = ['EPUB/c1.xhtml']): { nav: Nav
   const pkg: PackageDocument = {
     path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
     metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
+    metas: [],
     manifest: [navItem, { id: 'c1', href: 'c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }],
     spinePresent: true, spine: [{ idref: 'c1', linear: true, properties: [], loc: LOC }], guide: [], loc: LOC,
   }
@@ -114,6 +115,7 @@ describe('validateNav — reading order (NAV-011)', () => {
     const pkg: PackageDocument = {
       path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
       metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
+      metas: [],
       manifest: [
         navItem,
         { id: 'c1', href: 'c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC },
@@ -164,6 +166,7 @@ describe('validateNav — reading order document sub-case (NAV-011)', () => {
     const pkg: PackageDocument = {
       path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
       metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
+      metas: [],
       manifest: [navItem, { id: 'c1', href: 'c1.xhtml', mediaType: 'application/xhtml+xml', properties: [], loc: LOC }],
       spinePresent: true, spine: [{ idref: 'c1', linear: true, properties: [], loc: LOC }], guide: [], loc: LOC,
     }

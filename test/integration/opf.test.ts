@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { zipSync } from 'fflate'
 import { validateEpub } from '../../src/index.js'
+import { buildEpub2, OPF2 } from '../fixtures/build.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 
@@ -39,6 +40,25 @@ describe('integration: OPF validation', () => {
     const opfIds = report.messages.map((m) => m.id).filter((id) => id.startsWith('OPF') || id === 'RSC-001' || id === 'RSC-005')
     expect(opfIds).toEqual([])
     expect(report.epubVersion).toBe('3.3') // default target for an unspecified EPUB 3 file
+  })
+
+  it('reports an EPUB 3 property meta in an EPUB 2 package with EPUBCheck wording', async () => {
+    const report = await validateEpub(
+      buildEpub2({
+        files: {
+          'EPUB/package.opf': OPF2.replace(
+            '</metadata>',
+            '<meta property="dcterms:modified">2020-01-01T00:00:00Z</meta></metadata>',
+          ),
+        },
+      }),
+    )
+    expect(report.valid).toBe(false)
+    expect(report.messages.map((m) => `${m.severity} ${m.id}: ${m.message}`)).toEqual([
+      `ERROR RSC-005: Error while parsing file 'EPUB/package.opf': attribute "property" not allowed here; expected attribute "content", "id", "name", "scheme" or "xml:lang"`,
+      `ERROR RSC-005: Error while parsing file 'EPUB/package.opf': element "meta" missing required attributes "content" and "name"`,
+      `ERROR RSC-005: Error while parsing file 'EPUB/package.opf': text not allowed here; expected the element end-tag`,
+    ])
   })
 
   it('flags a manifest item whose file is missing', async () => {
