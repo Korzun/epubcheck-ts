@@ -57,11 +57,14 @@ export function attribute(nc: NameClass, p: Pattern): Pattern {
  * module-level `const` closing over the built pattern) or the recursive builder
  * function itself, passed directly:
  *
- *   const p = ref(collectionPattern)          // safe: stable function reference
+ *   const p = ref(collectionPattern)           // safe: stable function reference
+ *   const p = ref(() => collection)            // safe: arrow returns a stable const
  *   const p = ref(() => collectionPattern())   // UNSAFE: fresh arrow every call
  *
- * The unsafe form allocates a new closure (and a new `Pattern` object graph) on
- * every expansion, defeating identity-based cycle guards. The type system does
+ * The middle form is what both grammars use (`ref(() => collection)` over a
+ * module-level `const`): the arrow is allocated once and returns the same object
+ * on every call. The unsafe form instead allocates a new closure (and a new
+ * `Pattern` object graph) on every expansion, defeating identity-based cycle guards. The type system does
  * not enforce this — it is caller discipline. `walkGrammarElements` backstops
  * violations: it throws an actionable error rather than overflowing the stack.
  */
