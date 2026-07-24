@@ -194,6 +194,21 @@ npm run build     # bundle to dist/ via tsdown
 Unit tests are colocated with their source (`src/**/*.test.ts`); integration
 tests and fixtures live under `test/`.
 
+### Differential testing
+
+`test/differential` compares our output against the real EPUBCheck jar case by case.
+
+```sh
+brew install epubcheck
+EPUBCHECK_DIFF=1 npx vitest run test/differential
+```
+
+It is skipped unless `EPUBCHECK_DIFF=1` is set and `epubcheck` is on `PATH`, so CI
+without the jar stays green. The harness expands EPUBCheck's aggregated messages (a
+single message with multiple `locations`) into one record per occurrence before
+comparing multisets, and filters the jar side down to the message ids we implement
+(`KNOWN_UNIMPLEMENTED` lists the out-of-scope ids it drops).
+
 ## Releasing
 
 Publishing is automated by

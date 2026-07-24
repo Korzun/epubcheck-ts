@@ -1,6 +1,16 @@
 import { SaxesParser } from 'saxes'
 import { msg, type Location, type Message } from '../messages/format.js'
 
+/** One attribute with its namespace resolved. `xmlns` declarations are not attributes to a schema. */
+export interface XmlAttr {
+  /** Qualified name as written (`opf:role`, `id`). Schema messages echo this form. */
+  qname: string
+  local: string
+  /** Resolved namespace URI; undefined for unprefixed attributes. */
+  ns?: string
+  value: string
+}
+
 export interface XmlNode {
   type: 'element' | 'text'
   name?: string
@@ -8,6 +18,8 @@ export interface XmlNode {
   /** Namespace prefix as written, when the element carried one (schema messages echo it). */
   prefix?: string
   attrs?: Record<string, string>
+  /** Attributes in document order, namespace-resolved, xmlns declarations excluded. */
+  attributes?: XmlAttr[]
   children?: XmlNode[]
   text?: string
   loc: Location
@@ -28,13 +40,24 @@ export function parseXml(bytes: Uint8Array, path: string): { root?: XmlNode; mes
 
   parser.on('opentag', (tag) => {
     const attrs: Record<string, string> = {}
-    for (const [key, value] of Object.entries(tag.attributes)) attrs[key] = value.value
+    const attributes: XmlAttr[] = []
+    for (const [key, value] of Object.entries(tag.attributes)) {
+      attrs[key] = value.value
+      if (key === 'xmlns' || key.startsWith('xmlns:')) continue
+      attributes.push({
+        qname: key,
+        local: value.local,
+        ...(value.uri ? { ns: value.uri } : {}),
+        value: value.value,
+      })
+    }
     const node: XmlNode = {
       type: 'element',
       name: tag.local,
       ns: tag.uri || undefined,
       prefix: tag.prefix || undefined,
       attrs,
+      attributes,
       children: [],
       loc: { path, line: parser.line, column: parser.column },
     }

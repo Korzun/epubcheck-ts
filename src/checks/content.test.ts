@@ -25,7 +25,7 @@ function setup(docs: Record<string, string>, extras: string[] = []): { pkg: Pack
   const pkg: PackageDocument = {
     path: 'EPUB/package.opf', version: '3.0', uniqueIdentifier: 'uid',
     metadata: { identifiers: [{ id: 'uid', value: 'u' }], titles: ['T'], languages: ['en'], modifiedCount: 1 },
-    metas: [],
+    root: { type: 'element', name: 'package', loc: LOC },
     manifest,
     spinePresent: true,
     spine: manifest.map((m) => ({ idref: m.id, linear: true, properties: [], loc: LOC })),
