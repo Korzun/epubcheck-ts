@@ -80,6 +80,20 @@ describe('validateNcx', () => {
     expect(m.map((x) => x.id)).toEqual(['NCX-004'])
   })
 
+  it('no NCX-001 when the OPF unique identifier is empty (jar parity)', () => {
+    // An empty dc:identifier resolves the OPF id to "" and is already reported as
+    // RSC-005 by the schema layer; epubcheck does not additionally flag an NCX
+    // mismatch against a blank OPF identifier.
+    const ncx = baseNcx()
+    const { pkg2, container } = baseSetup()
+    const emptyIdPkg: PackageDocument = {
+      ...pkg2,
+      metadata: { ...pkg2.metadata, identifiers: [{ id: 'uid', value: '' }] },
+    }
+    const m = validateNcx({ ...ncx, uid: 'urn:uuid:x' }, emptyIdPkg, container, '2.0')
+    expect(m.map((x) => x.id)).not.toContain('NCX-001')
+  })
+
   it('NCX-006 per empty text label', () => {
     const ncx = baseNcx()
     const { pkg2, container } = baseSetup()

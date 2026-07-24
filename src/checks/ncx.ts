@@ -27,8 +27,11 @@ function checkIdentifier(ncx: NcxDocument, pkg: PackageDocument): Message[] {
   if (ncx.uid !== ncx.uid.trim()) {
     messages.push(msg('NCX-004', ncx.uidLoc ?? ncx.loc))
   }
+  // Skip the comparison when the OPF has no usable unique identifier: an empty or
+  // whitespace-only dc:identifier is already reported (RSC-005) and epubcheck does
+  // not additionally flag an NCX mismatch against a blank OPF identifier.
   const opfUid = pkg.metadata.identifiers.find((i) => i.id === pkg.uniqueIdentifier)?.value
-  if (opfUid !== undefined && ncx.uid.trim() !== opfUid) {
+  if (opfUid !== undefined && opfUid.trim() !== '' && ncx.uid.trim() !== opfUid) {
     messages.push(msg('NCX-001', ncx.uidLoc ?? ncx.loc, ncx.uid, opfUid))
   }
   return messages
