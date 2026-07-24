@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseXml, findDescendants, childElements } from './xml.js'
 import { textContent } from './xml.js'
+import type { XmlNode } from './xml.js'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 
@@ -35,5 +36,34 @@ describe('textContent', () => {
   it('concatenates nested text', () => {
     const { root } = parseXml(new TextEncoder().encode('<a>Hello <b>World</b>!</a>'), 'm.xml')
     expect(textContent(root!)).toBe('Hello World!')
+  })
+})
+
+describe('namespace-aware attributes', () => {
+  const doc = (s: string): XmlNode =>
+    parseXml(new TextEncoder().encode(s), 'p.opf').root!
+
+  it('records qname, local, ns and value in document order', () => {
+    const root = doc(
+      '<package xmlns="http://www.idpf.org/2007/opf" xmlns:opf="http://www.idpf.org/2007/opf">' +
+        '<meta id="a" opf:role="aut" xml:lang="en" scheme="s"/></package>',
+    )
+    const meta = root.children!.find((c) => c.name === 'meta')!
+    expect(meta.attributes).toEqual([
+      { qname: 'id', local: 'id', value: 'a' },
+      { qname: 'opf:role', local: 'role', ns: 'http://www.idpf.org/2007/opf', value: 'aut' },
+      { qname: 'xml:lang', local: 'lang', ns: 'http://www.w3.org/XML/1998/namespace', value: 'en' },
+      { qname: 'scheme', local: 'scheme', value: 's' },
+    ])
+  })
+
+  it('excludes xmlns declarations', () => {
+    const root = doc('<package xmlns="http://x" xmlns:opf="http://y" id="p"/>')
+    expect(root.attributes).toEqual([{ qname: 'id', local: 'id', value: 'p' }])
+  })
+
+  it('leaves the legacy attrs map untouched', () => {
+    const root = doc('<package xmlns="http://x" id="p"/>')
+    expect(root.attrs).toEqual({ xmlns: 'http://x', id: 'p' })
   })
 })
