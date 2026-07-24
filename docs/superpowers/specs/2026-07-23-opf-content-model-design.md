@@ -36,7 +36,7 @@ detail takes one of ten shapes:
 | 5 | `element "C" not allowed anywhere; expected <list>` |
 | 6 | `element "C" not allowed here; expected <list>` |
 | 7 | `element "C" not allowed yet; missing required element "Y"` |
-| 8 | `element "P" incomplete; missing required element "C"` |
+| 8 | `element "P" incomplete; missing required element[s] <list>` |
 | 9 | `element "P" incomplete; expected <list>` |
 | 10 | `value of attribute "A" is invalid; must be <constraint>` |
 
@@ -111,7 +111,14 @@ package-30's metadata is a plain interleave with no branch choice, so it is stru
 optional on `reference`. No `type` vocabulary check exists for OPF 2.0 and none must be added.
 This was flagged as the highest false-positive risk in the brief; it turns out to need no work.
 
-### IDREF referential integrity is not schema-enforced
+### A bad attribute VALUE does not also report the attribute missing
+
+`<itemref idref="1"/>` -- required attribute present, value not a valid NCName -- yields only
+`value of attribute "idref" is invalid; must be an XML name without colons`. There is NO
+accompanying `missing required attribute` message. Probed against the jar; a validator that
+emits both is producing a false positive.
+
+## IDREF referential integrity is not schema-enforced
 
 `<spine toc="nope">` produces only `OPF-049`, no `RSC-005`. Jing's IDREF resolution does not fire
 for these grammars. `datatype.ID` *is* enforced as a lexical constraint, though:
