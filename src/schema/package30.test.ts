@@ -30,11 +30,17 @@ describe('package-30 grammar', () => {
   })
 
   it('accepts link, refines and i18n attributes', () => {
-    expect(run(PKG(`${BASE}<link rel="cc:license" href="http://example.com/l"/><dc:title id="t" dir="ltr" xml:lang="en">T2</dc:title>`))).toEqual([])
+    expect(run(PKG(`${BASE}<link rel="cc:license" href="http://example.com/l" refines="#uid"/><dc:title id="t" dir="ltr" xml:lang="en">T2</dc:title>`))).toEqual([])
   })
 
   it('accepts spine page-progression-direction and itemref properties', () => {
-    expect(run(PKG(BASE).replace('<spine>', '<spine page-progression-direction="rtl">'))).toEqual([])
+    expect(
+      run(
+        PKG(BASE)
+          .replace('<spine>', '<spine page-progression-direction="rtl">')
+          .replace('<itemref idref="nav"/>', '<itemref idref="nav" properties="page-spread-right"/>'),
+      ),
+    ).toEqual([])
   })
 
   it('rejects an OPF 2.0 spine toc idref datatype violation', () => {
@@ -109,6 +115,109 @@ describe('package-30 grammar', () => {
         '"dc:contributor", "dc:coverage", "dc:creator", "dc:date", "dc:description", "dc:format", ' +
         '"dc:identifier", "dc:language", "dc:publisher", "dc:relation", "dc:rights", "dc:source", ' +
         '"dc:subject", "dc:title", "dc:type", "link" or "meta"',
+    ])
+  })
+
+  // --- Previously unpinned grammar regions: guide/reference, bindings/mediaType,
+  // --- collection.metadata, the dcRich/dcSimple split, optional(dcDate) vs zeroOrMore,
+  // --- and the seq(...) ordering of package's children.
+
+  it('accepts a deprecated guide/reference after the spine', () => {
+    expect(
+      run(
+        PKG(BASE).replace(
+          '</spine>',
+          '</spine><guide><reference type="toc" title="T" href="content_001.xhtml"/></guide>',
+        ),
+      ),
+    ).toEqual([])
+  })
+
+  it('accepts bindings/mediaType', () => {
+    expect(
+      run(
+        PKG(BASE).replace(
+          '</spine>',
+          '</spine><bindings><mediaType media-type="application/x-foo" handler="content"/></bindings>',
+        ),
+      ),
+    ).toEqual([])
+  })
+
+  it('accepts collection.metadata with a single dc:title and no dc:identifier or dc:language', () => {
+    expect(
+      run(
+        PKG(BASE).replace(
+          '</spine>',
+          '</spine><collection role="x">' +
+            '<metadata><dc:title>C</dc:title></metadata>' +
+            '<link href="content_001.xhtml"/></collection>',
+        ),
+      ),
+    ).toEqual([])
+  })
+
+  it('accepts dc:source with the full i18n attribute list', () => {
+    expect(run(PKG(`${BASE}<dc:source dir="ltr">s</dc:source>`))).toEqual([])
+  })
+
+  it('rejects dir on dc:type, proving the dcRich/dcSimple attribute-list split', () => {
+    expect(run(PKG(`${BASE}<dc:type dir="ltr">t</dc:type>`))).toEqual([
+      'attribute "dir" not allowed here; expected attribute "id"',
+    ])
+  })
+
+  it('rejects a second dc:date, since dc:date is optional not zeroOrMore', () => {
+    // Placed before the still-outstanding required dc:identifier/dc:title/dc:language
+    // (rather than after, once metadata is already complete): only there does the
+    // grammar withhold the end-tag alternative, matching the jar's exact wording.
+    expect(
+      run(PKG(`<dc:date>2020</dc:date><dc:date>2021</dc:date>${BASE}`)),
+    ).toEqual([
+      'element "dc:date" not allowed here; expected element "dc:contributor", "dc:coverage", ' +
+        '"dc:creator", "dc:description", "dc:format", "dc:identifier", "dc:language", ' +
+        '"dc:publisher", "dc:relation", "dc:rights", "dc:source", "dc:subject", "dc:title", ' +
+        '"dc:type", "link" or "meta"',
+    ])
+  })
+
+  it('rejects a guide placed after a collection, proving package children are an ordered sequence', () => {
+    expect(
+      run(
+        PKG(BASE).replace(
+          '</spine>',
+          '</spine>' +
+            '<collection role="x"><link href="content_001.xhtml"/></collection>' +
+            '<guide><reference type="toc" title="T" href="content_001.xhtml"/></guide>',
+        ),
+      ),
+    ).toEqual([
+      'element "guide" not allowed here; expected the element end-tag or element "collection"',
+    ])
+  })
+
+  // KNOWN MISMATCH — see .superpowers/sdd/task-9-report.md. Ground truth probed against
+  // the real EPUBCheck 5.3.0 jar for this exact document is the three messages below, in
+  // this order. Our `skipRequired` recovery (src/schema/validate.ts) instead produces only
+  // two messages, in a different order:
+  //   element "spine" not allowed yet; missing required element "manifest"
+  //   element "manifest" not allowed here; expected element "spine"
+  // Per instructions this was NOT "fixed" by touching validate.ts or adjusting the
+  // expected strings below to match the actual (wrong) output; it is left `.skip`ped and
+  // reported verbatim instead, since it is the first real-jar disconfirmation of an
+  // inferred recovery.
+  it.skip('rejects spine placed before manifest, with three ordered messages including the skipRequired recovery', () => {
+    const xml =
+      `<package xmlns="${OPF_NS}" xmlns:dc="${DC_NS}" version="3.0" unique-identifier="uid">` +
+      `<metadata>${BASE}</metadata>` +
+      `<spine><itemref idref="nav"/></spine>` +
+      `<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest>` +
+      `<spine><itemref idref="nav"/></spine>` +
+      `</package>`
+    expect(run(xml)).toEqual([
+      'element "manifest" not allowed here; expected the element end-tag or element "bindings", "collection" or "guide"',
+      'element "spine" not allowed here; expected the element end-tag or element "bindings", "collection" or "guide"',
+      'element "spine" not allowed yet; missing required element "manifest"',
     ])
   })
 })
